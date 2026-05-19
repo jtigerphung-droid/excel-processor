@@ -6,7 +6,7 @@ from datetime import datetime
 # 1. Cấu hình tiêu đề trang Web hiển thị
 st.set_page_config(page_title="Công cụ Xử lý Excel Tự động", layout="centered")
 st.title("📊 ỨNG DỤNG GỘP VÀ LÀM SẠCH DỮ LIỆU EXCEL")
-st.write("Giải pháp thay thế hoàn toàn cho file `.bas` (VBA) cũ.")
+st.write("Phiên bản cập nhật: Bộ lọc thông minh triệt để dòng thừa.")
 
 # 2. Thành phần Giao diện: Cho phép người dùng kéo thả file Excel vào
 uploaded_file = st.file_uploader("Bước 1: Chọn file Excel thô cần xử lý (.xlsx)", type=["xlsx"])
@@ -19,39 +19,40 @@ if uploaded_file is not None:
         try:
             with st.spinner("Đang xử lý dữ liệu ngầm, vui lòng đợi trong giây lát..."):
                 
-                # Đọc tất cả các sheet từ file excel tải lên (trả về một thư viện các sheet)
                 excel_file = pd.ExcelFile(uploaded_file)
                 all_sheets_data = []
                 
-                # Duyệt qua từng sheet trong file Excel giống như vòng lặp For Each trong VBA
+                # Duyệt qua từng sheet trong file Excel
                 for sheet_name in excel_file.sheet_names:
-                    # Đọc sheet, bỏ qua 8 dòng hành chính đầu tiên (Dữ liệu bảng bắt đầu từ dòng 9, tức index 8)
-                    # Không lấy tiêu đề tự động để tránh bị lệch cột
+                    # Đọc sheet, bỏ qua 8 dòng hành chính đầu tiên
                     df_sheet = pd.read_excel(excel_file, sheet_name=sheet_name, skiprows=8, header=None)
                     
-                    # Nếu sheet không có dữ liệu thì bỏ qua
                     if df_sheet.empty:
                         continue
                         
-                    # Đặt tên cột chuẩn cho bảng (Tương ứng với mẫu ảnh số 2 của bạn)
+                    # Đặt tên cột tạm thời để dễ xử lý lọc
                     df_sheet.columns = ['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']
                     
-                    # --- BẮT ĐẦU LÀM SẠCH DỮ LIỆU (Thay thế cho file BAS số 2) ---
-                    # Loại bỏ các dòng trống hoàn toàn
-                    df_sheet = df_sheet.dropna(subset=['Tên sách', 'Mã số'], how='all')
+                    # --- BỘ LỌC THÔNG MINH CẬP NHẬT (Xử lý triệt để ảnh lỗi) ---
                     
-                    # Ép kiểu cột Tên sách về dạng chuỗi văn bản để lọc chính xác
-                    df_sheet['Tên sách'] = df_sheet['Tên sách'].astype(str).str.strip()
+                    # Cắt khoảng trắng thừa ở tất cả các cột dạng chữ để tránh sót lỗi
+                    for col in ['Tên sách', 'Mã số', 'ĐVT']:
+                        df_sheet[col] = df_sheet[col].astype(str).str.strip()
                     
-                    # Loại bỏ dòng Tiêu đề lặp lại nếu có (dòng chứa chữ "Tên sách")
-                    df_sheet = df_sheet[df_sheet['Tên sách'] != 'Tên sách']
+                    # Lọc 1: Xóa ngay dòng nếu cột "Mã số" trống, hoặc chứa chữ "Mã số" (tiêu đề lặp)
+                    df_sheet = df_sheet[df_sheet['Mã số'].notna() & (df_sheet['Mã số'] != '') & (df_sheet['Mã số'] != 'nan')]
+                    df_sheet = df_sheet[df_sheet['Mã số'] != 'Mã số']
                     
-                    # Loại bỏ 3 dòng tổng kết cuối bảng dựa vào từ khóa
-                    list_xoa = ['Tổng cộng:', 'Thuế VAT:', 'Thành tiền:', 'Tổng cộng', 'Thuế VAT']
-                    df_sheet = df_sheet[~df_sheet['Tên sách'].isin(list_xoa)]
+                    # Lọc 2: Xóa ngay dòng nếu cột "Tên sách" chứa các từ khóa hành chính hoặc tổng kết
+                    tu_khoa_xoa = [
+                        'Tổng cộng:', 'Thuế VAT:', 'Thành tiền:', 'Tổng cộng', 'Thuế VAT', 
+                        'Phụ trách cung tiêu', 'Người giao hàng', 'Thủ Kho', 'nan', 'STT', 'Tên sách'
+                    ]
+                    # Kiểm tra xem cột Tên sách có chứa bất kỳ từ khóa rác nào ở trên không
+                    df_sheet = df_sheet[~df_sheet['Tên sách'].isin(tu_khoa_xoa)]
                     
-                    # Lọc thêm các dòng chứa chữ trống hoặc rác hệ sinh ra
-                    df_sheet = df_sheet[df_sheet['Tên sách'] != 'nan']
+                    # Lọc 3: Một lớp khóa phụ - nếu dòng nào có "Giá bìa" hoặc "Số lượng" không phải là số, loại bỏ luôn
+                    df_sheet = df_sheet[pd.to_numeric(df_sheet['Số lượng'], errors='coerce').notna()]
                     
                     # Đưa dữ liệu đã sạch của sheet này vào danh sách gộp
                     all_sheets_data.append(df_sheet)
@@ -60,14 +61,20 @@ if uploaded_file is not None:
                 if all_sheets_data:
                     df_final = pd.concat(all_sheets_data, ignore_index=True)
                     
-                    # Đánh lại cột STT tự động từ 1 tăng dần cho toàn bộ file tổng
+                    # Ép kiểu dữ liệu chuẩn cho các cột số để tính toán đẹp mắt
+                    df_final['Số lượng'] = pd.to_numeric(df_final['Số lượng'])
+                    df_final['Giá bìa'] = pd.to_numeric(df_final['Giá bìa'])
+                    df_final['Đơn giá'] = pd.to_numeric(df_final['Đơn giá'])
+                    df_final['Thành tiền'] = pd.to_numeric(df_final['Thành tiền'])
+                    
+                    # Đánh lại cột STT tự động từ 1 tăng dần cho toàn bộ file tổng [cite: 1]
                     df_final['STT'] = range(1, len(df_final) + 1)
                     
-                    st.success("🎉 Xử lý hoàn thành xuất sắc!")
+                    st.success("🎉 Đã làm sạch toàn bộ dòng thừa!")
                     
-                    # Hiển thị bản xem trước (Preview) 5 dòng đầu và 5 dòng cuối ngay trên Web
-                    st.write("### Bản xem trước dữ liệu kết quả:")
-                    st.dataframe(df_final.head(10)) # Hiển thị 10 dòng đầu để kiểm tra
+                    # Hiển thị bản xem trước (Preview) ngay trên Web
+                    st.write("### Bản xem trước dữ liệu kết quả đã sửa lỗi:")
+                    st.dataframe(df_final.head(15))
                     
                     # Chuyển đổi dữ liệu kết quả thành file Excel để người dùng tải về
                     output = io.BytesIO()
@@ -80,11 +87,11 @@ if uploaded_file is not None:
                     st.download_button(
                         label="📥 Bước 3: Tải file Excel kết quả hoàn chỉnh",
                         data=processed_data,
-                        file_name=f"Ket_Qua_Gop_Sach_{thoigian_hientai}.xlsx",
+                        file_name=f"Ket_Qua_Gop_Sach_SuaLoi_{thoigian_hientai}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
                 else:
-                    st.warning("Không tìm thấy dữ liệu hợp lệ trong các sheet.")
+                    st.warning("Không tìm thấy dữ liệu hợp lệ trong các sheet sau khi lọc.")
                     
         except Exception as e:
             st.error(f"Đã xảy ra lỗi trong quá trình xử lý: {str(e)}")
