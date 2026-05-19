@@ -8,7 +8,7 @@ from openpyxl.utils import get_column_letter
 # --- CẤU HÌNH GIAO DIỆN WEB ---
 st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
 st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
-st.write("Giải pháp phân tách 2 giai đoạn độc lập: Gộp/Làm sạch thô ➔ Tính toán Master Process chuyên sâu.")
+st.write("Phiên bản Vá Lỗi Khớp Cột (Column Mismatch): Tự động bù cột thiếu hụt và phân tách 2 giai đoạn.")
 
 # --- HÀM TRANG TRÍ EXCEL QUY CHUẨN ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
@@ -64,11 +64,11 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
 tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch File Thô", "🧮 GIAI ĐOẠN 2: Tính Toán Master Process"])
 
 # ==========================================================================================
-# GIAI ĐOẠN 1: GỘP VÀ LÀM SẠCH DỮ LIỆU THÔ (TƯƠNG ĐƯƠNG FILE B1 + B2 .BAS)
+# GIAI ĐOẠN 1: GỘP VÀ LÀM SẠCH DỮ LIỆU THÔ (VÁ LỖI THIẾU CỘT VẬT LÝ)
 # ==========================================================================================
 with tab_giai_doan_1:
     st.header("Bước 1: Gộp Nhiều Sheet & Loại Bỏ 100% Dòng Rác")
-    st.info("Tính năng này sẽ gom tất cả các sheet của file thô lại, cắt bỏ tiêu đề lặp lại, dòng trống, dòng chữ ký hành chính để tạo ra file sạch chuẩn.")
+    st.info("Tính năng này tự động chuẩn hóa số lượng cột, gộp các sheet và loại bỏ toàn bộ dòng rác, dòng tiêu đề lặp lại.")
     
     file_tho = st.file_uploader("Tải lên file Excel THÔ (File có nhiều sheet hệ thống):", type=["xlsx"], key="file_tho")
     
@@ -79,10 +79,11 @@ with tab_giai_doan_1:
                 list_df_sheets = []
                 
                 for sheet_name in excel_file.sheet_names:
-                    # Đọc toàn bộ sheet từ dòng đầu tiên dưới dạng chuỗi để chống lỗi lệch dòng
+                    # Đọc toàn bộ dữ liệu dưới dạng chuỗi văn bản thô
                     df_raw = pd.read_excel(excel_file, sheet_name=sheet_name, header=None).astype(str)
+                    if df_raw.empty: continue
                     
-                    # Tìm xem dòng nào thực sự chứa tiêu đề chính (STT, Tên sách, Mã số...)
+                    # Tìm dòng chứa tiêu đề mấu chốt để xác định điểm cắt dữ liệu
                     header_row_idx = None
                     for idx, row in df_raw.iterrows():
                         row_list = row.str.strip().tolist()
@@ -90,46 +91,57 @@ with tab_giai_doan_1:
                             header_row_idx = idx
                             break
                     
-                    # Nếu tìm thấy tiêu đề chính, cắt lấy phần dữ liệu bên dưới nó
+                    # Cắt lấy phần nội dung phía dưới dòng tiêu đề tìm được
                     if header_row_idx is not None:
                         df_data = df_raw.iloc[header_row_idx + 1:].copy()
                     else:
-                        df_data = df_raw.iloc[8:].copy() # Mặc định dòng số 9 theo phán đoán cũ
+                        df_data = df_raw.iloc[8:].copy()
                     
-                    # Lấy đúng 9 cột đầu tiên tương ứng từ A đến I
+                    # THUẬT TOÁN BÙ CỘT THÔNG MINH: Đảm bảo bảng luôn có ít nhất 9 cột trước khi gán tên
+                    current_cols = df_data.shape[1]
+                    if current_cols < 9:
+                        for c_add in range(9 - current_cols):
+                            df_data[f"custom_col_add_{c_add}"] = "0"  # Thêm cột trống định dạng chuỗi
+                    
+                    # Trích xuất chuẩn xác 9 cột từ chỉ số 0 đến 8
                     df_data = df_data.iloc[:, 0:9]
                     df_data.columns = ['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']
                     list_df_sheets.append(df_data)
                 
-                # Gộp cơ học tất cả các sheet lại thành 1 bảng dài
+                if not list_df_sheets:
+                    st.error("Không tìm thấy dữ liệu hợp lệ trong các sheet.")
+                    st.stop()
+
+                # Tiến hành gộp dữ liệu diện rộng
                 df_combined = pd.concat(list_df_sheets, ignore_index=True)
                 
-                # --- QUY TRÌNH QUÉT LỌC VÀ LÀM SẠCH TUYỆT ĐỐI (LOGIC FILE B2.BAS) ---
+                # Làm sạch khoảng trắng dư thừa
                 for col in df_combined.columns:
                     df_combined[col] = df_combined[col].str.strip()
                 
-                # Xóa các dòng rác dựa trên cột Mã số và Tên sách
+                # Loại bỏ các dòng trống hoặc mã trống không hợp lệ
                 df_combined = df_combined[df_combined['Mã số'].notna() & (df_combined['Mã số'] != '') & (df_combined['Mã số'] != 'nan') & (df_combined['Mã số'] != 'Mã số')]
                 
-                tu_khoa_xoa = ['Tổng cộng:', 'Thuế VAT:', 'Thành tiền:', 'Tổng cộng', 'Thuế VAT', 'Phụ trách cung tiêu', 'Người giao hàng', 'Thủ Kho', 'nan', 'STT', 'Tên sách', 'Cộng trước:', 'Cộng trước']
+                # Bộ lọc triệt tiêu các từ khóa dòng tổng kết trung gian và dòng chữ ký kế toán
+                tu_khoa_xoa = ['Tổng cộng:', 'Thuế VAT:', 'Thành tiền:', 'Tổng cộng', 'Thuế VAT', 'Phụ trách cung tiêu', 'Người giao hàng', 'Thủ Kho', 'nan', 'STT', 'Tên sách', 'Cộng trước:', 'Cộng trước', 'Người lập']
                 df_combined = df_combined[~df_combined['Tên sách'].isin(tu_khoa_xoa)]
                 df_combined = df_combined[~df_combined['Mã số'].isin(tu_khoa_xoa)]
                 
-                # Chuyển đổi các cột số liệu về dạng số chuẩn kế toán
+                # Ép toàn bộ định dạng tiền tệ và số lượng về dạng số xử lý được
                 for col in ['Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']:
                     df_combined[col] = pd.to_numeric(df_combined[col].str.replace(',', '').str.replace('.', ''), errors='coerce').fillna(0)
                 
-                # Loại bỏ dòng không phát sinh số lượng thực tế
+                # Loại bỏ dòng không có biến động số lượng phát hành
                 df_combined = df_combined[df_combined['Số lượng'] != 0]
                 df_combined['STT'] = range(1, len(df_combined) + 1)
                 
-                # Xuất file dữ liệu sạch
+                # Khởi tạo tệp tin xuất ra cho Giai đoạn 2
                 out_sach = io.BytesIO()
                 with pd.ExcelWriter(out_sach, engine='openpyxl') as writer:
                     df_combined.to_excel(writer, index=False, sheet_name="Du_Lieu_Sach_100")
                     trang_tri_sheet(writer.sheets["Du_Lieu_Sach_100"], "003366")
                 
-                st.success("🎉 ĐÃ GỘP VÀ LÀM SẠCH THÀNH CÔNG FILE DỮ LIỆU GỐC!")
+                st.success("🎉 GIAI ĐOẠN 1 HOÀN THÀNH: ĐÃ GỘP VÀ LÀM SẠCH 100% FILE DỮ LIỆU THÔ!")
                 st.dataframe(df_combined, use_container_width=True)
                 
                 st.download_button(
@@ -146,17 +158,15 @@ with tab_giai_doan_1:
 # ==========================================================================================
 with tab_giai_doan_2:
     st.header("Bước 2: Phân Tích Danh Mục, Xử Lý Âm Dương & Tách Hóa Đơn")
-    st.warning("⚠️ LƯU Ý: Vui lòng nạp file Excel đã được LÀM SẠCH tải ra từ Giai đoạn 1 vào đây để đảm bảo tính toán chính xác.")
+    st.warning("⚠️ LƯU Ý: Vui lòng nạp file Excel đã được LÀM SẠCH tải ra từ Giai đoạn 1 vào đây để tính toán.")
     
     file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH:", type=["xlsx"], key="file_sach")
     
     if file_sach is not None:
         if st.button("🧮 KHỞI CHẠY THUẬT TOÁN TÍNH TOÁN MASTER REPORT"):
             try:
-                # Đọc dữ liệu từ file sạch đã qua xử lý ở bước 1
                 df_master = pd.read_excel(file_sach, sheet_name="Du_Lieu_Sach_100")
                 
-                # Tách riêng mảng hàng dương và hàng âm để xử lý bù trừ theo mã
                 df_duong = df_master[df_master['Số lượng'] >= 0].copy()
                 df_am = df_master[df_master['Số lượng'] < 0].copy()
                 
@@ -191,7 +201,7 @@ with tab_giai_doan_2:
                     df_tonghop_tra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
                     df_chitiet_am = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
                 
-                # 2.4 Chi tiết toàn bộ mảng dữ liệu bán ra dương
+                # 2.4 Toàn bộ mảng dữ liệu bán ra dương thực tế
                 df_tonghop_banra = df_duong.copy()
                 if not df_tonghop_banra.empty:
                     df_tonghop_banra['Thành tiền'] = df_tonghop_banra['Số lượng'] * df_tonghop_banra['Đơn giá']
@@ -200,7 +210,7 @@ with tab_giai_doan_2:
                 else:
                     df_tonghop_banra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
 
-                # --- BƯỚC 3: ĐÓNG GÓI RA FILE EXCEL MULTI-SHEETS ĐÃ TRANG TRÍ ---
+                # --- BƯỚC 3: ĐÓNG GÓI RA FILE EXCEL MULTI-SHEETS ---
                 out_report = io.BytesIO()
                 with pd.ExcelWriter(out_report, engine='openpyxl') as writer:
                     grand_summary_data = []
@@ -229,7 +239,6 @@ with tab_giai_doan_2:
                         trang_tri_sheet(ws, color, has_vat_summary=has_vat)
                         return len(df), sum_sl, sum_tt, vat, sau_thue
 
-                    # Ghi nhận các cấu trúc báo cáo vào workbook
                     if not df_tonghop_ban.empty:
                         ln, sl, tt, _, _ = ghi_sheet_kem_tong(df_tonghop_ban, "Tong_Hop_Ma_Hang_Ban", "003366")
                         grand_summary_data.append(["Tong Hop Ma Hang Ban", "Duong", ln, sl, tt, 0, tt, "Gia Bia (Khong VAT)"])
@@ -246,7 +255,7 @@ with tab_giai_doan_2:
                         ln, sl, tt, vt, st = ghi_sheet_kem_tong(df_tonghop_banra, "Tong_Hop_Ban_Ra", "00B050", has_vat=True)
                         grand_summary_data.append(["Tong Hop Ban Ra", "Duong", ln, sl, tt, vt, st, "Toan bo du lieu duong"])
 
-                    # Phân tách nhỏ hóa đơn tự động lặp lại (Batch Size = 1000 dòng theo file .bas)
+                    # Phân tách nhỏ hóa đơn (Batch Size = 1000 dòng theo file .bas)
                     batch_size = 1000
                     sheet_index = 1
                     if not df_tonghop_banra.empty:
@@ -258,12 +267,11 @@ with tab_giai_doan_2:
                             grand_summary_data.append([f"Hoa Don {sheet_index}", "Duong", ln, sl, tt, vt, st, "Tach le 1000 dong"])
                             sheet_index += 1
 
-                    # Xây dựng trang Dashboard tổng kết chung đưa lên hàng đầu
+                    # Báo cáo tổng quan Dashboard đưa lên trang đầu
                     df_grand = pd.DataFrame(grand_summary_data, columns=["Ten Sheet / Hang muc", "Loai", "So dong", "So luong", "Truoc Thue", "VAT (5%)", "Sau Thue", "Ghi chu"])
                     df_grand.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
                     ws_grand = writer.sheets["Tong_Ket_Chung"]
                     
-                    # Tính toán doanh thu thực tế sau khi bù trừ bán - trả toàn doanh nghiệp
                     thuong_sl = df_tonghop_banra['Số lượng'].sum() + df_chitiet_am['Số lượng'].sum() if not df_chitiet_am.empty else df_tonghop_banra['Số lượng'].sum()
                     thuong_tt = df_tonghop_banra['Thành tiền'].sum() + df_chitiet_am['Thành tiền'].sum() if not df_chitiet_am.empty else df_tonghop_banra['Thành tiền'].sum()
                     thuong_vat = thuong_tt * 0.05
@@ -278,14 +286,12 @@ with tab_giai_doan_2:
                     
                     trang_tri_sheet(ws_grand, "000000", total_row_type="grand")
                     
-                    # Sắp xếp đẩy sheet tổng lên hàng đầu của file Excel
                     wb = writer.book
                     order = [wb.sheetnames[-1]] + wb.sheetnames[:-1]
                     wb._sheets = [wb._sheets[wb.sheetnames.index(name)] for name in order]
 
                 st.success("🎉 PHÂN TÍCH TÍNH TOÁN MASTER REPORT THÀNH CÔNG RỰC RỠ!")
                 
-                # Hiển thị trực quan kết quả đối soát lên giao diện Web
                 tab_res1, tab_res2, tab_res3, tab_res4 = st.tabs(["📋 Bảng Tổng Kết Doanh Thu", "📈 Tổng Hợp Mã Bán", "📉 Tổng Hợp Mã Trả", "📦 Chi Tiết Hàng Âm"])
                 with tab_res1:
                     st.dataframe(df_grand, use_container_width=True)
