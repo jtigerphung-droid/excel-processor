@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 # --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
 st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
 st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
-st.write("Phiên bản khôi phục thuật toán ổn định trước Bước 2 - Phân tách 2 Giai đoạn độc lập.")
+st.write("Phiên bản chuẩn hóa nghiệp vụ Giai đoạn 2 - Loại bỏ tư duy VBA, tối ưu thuật toán Python độc lập.")
 
 # --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
@@ -73,11 +73,11 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
 tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch (Bản Ổn Định)", "🧮 GIAI ĐOẠN 2: Tính Toán Master Process"])
 
 # ==========================================================================================
-# GIAI ĐOẠN 1: KHÔI PHỤC NGUYÊN BẢN CODE CHẠY HOÀN CHỈNH TRƯỚC ĐÓ
+# GIAI ĐOẠN 1: GIỮ NGUYÊN BẢN THUẬT TOÁN GỐC ỔN ĐỊNH 100%
 # ==========================================================================================
 with tab_giai_doan_1:
     st.header("Bước 1: Gộp Nhiều Sheet & Làm Sạch Diện Rộng")
-    st.info("Sử dụng thuật toán dò quét gốc đã chạy ra kết quả chuẩn xác của bạn.")
+    st.info("Sử dụng thuật toán dò quét gốc ổn định để trích xuất file dữ liệu sạch.")
     
     uploaded_file = st.file_uploader("Kéo thả file Excel thô của hệ thống vào đây:", type=["xlsx"], key="file_tho_goc")
 
@@ -153,10 +153,9 @@ with tab_giai_doan_1:
                     st.error("❌ LỖI: Không trích xuất được dòng dữ liệu sách hợp lệ nào.")
                     st.stop()
                     
-                df_master = pd.DataFrame(all_cleaned_rows, columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
-                df_master['STT'] = range(1, len(df_master) + 1)
+                df_master = pd.DataFrame(all_cleaned_rows, columns=['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
+                df_master.insert(0, 'STT', range(1, len(df_master) + 1))
                 
-                # Xuất file sạch
                 out_sach = io.BytesIO()
                 with pd.ExcelWriter(out_sach, engine='openpyxl') as writer:
                     df_master.to_excel(writer, index=False, sheet_name="Du_Lieu_Sach_100")
@@ -172,157 +171,174 @@ with tab_giai_doan_1:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
             except Exception as e:
-                st.error(f"Lỗi hệ thống phục hồi: {str(e)}")
+                st.error(f"Lỗi hệ thống phục hồi G1: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: TÍNH TOÁN DỰA TRÊN FILE SẠCH KHÔNG ĐỤNG CHẠM CODE BƯỚC 1
+# GIAI ĐOẠN 2: THUẬT TOÁN TÍNH TOÁN ĐỘC LẬP CHUẨN HÓA NGHIỆP VỤ KẾ TOÁN
 # ==========================================================================================
 with tab_giai_doan_2:
     st.header("Bước 2: Phân Tích Danh Mục, Xử Lý Âm Dương & Tách Hóa Đơn")
-    st.warning("⚠️ LƯU Ý: Nạp file Excel 'DuLieu_Gop_Va_LamSach_Chuan_...' tải từ Giai đoạn 1 vào đây.")
+    st.warning("⚠️ LƯU Ý: Vui lòng nạp file Excel thu được từ Giai đoạn 1 vào đây.")
     
-    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="file_sach_sach")
+    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="file_sach_nghiep_vu")
     
     if file_sach is not None:
         if st.button("🧮 KHỞI CHẠY THUẬT TOÁN TÍNH TOÁN MASTER REPORT"):
             try:
-                df_master = pd.read_excel(file_sach, sheet_name="Du_Lieu_Sach_100")
+                # Đọc dữ liệu từ sheet "Du_Lieu_Sach_100"
+                df_input = pd.read_excel(file_sach, sheet_name="Du_Lieu_Sach_100")
                 
-                df_duong = df_master[df_master['Số lượng'] >= 0].copy()
-                df_am = df_master[df_master['Số lượng'] < 0].copy()
+                # ÉP CHUẨN KIỂU DỮ LIỆU ĐỂ TRÁNH LỖI KEYERROR / ĐỊNH DẠNG CHUỖI
+                df_input['Mã số'] = df_input['Mã số'].astype(str).str.strip()
+                df_input['Tên sách'] = df_input['Tên sách'].astype(str).str.strip()
+                df_input['ĐVT'] = df_input['ĐVT'].astype(str).str.strip()
                 
-                # 2.1 Tổng hợp mã hàng bán (Gom theo Mã số, Đơn giá = Giá bìa gốc)
-                if not df_duong.empty:
-                    df_tonghop_ban = df_duong.groupby(['Mã số', 'Tên sách', 'ĐVT', 'Giá bìa'], as_index=False).agg({'Số lượng': 'sum'})
-                    df_tonghop_ban['CK'] = 0
-                    df_tonghop_ban['Đơn giá'] = df_tonghop_ban['Giá bìa']
-                    df_tonghop_ban['Thành tiền'] = df_tonghop_ban['Số lượng'] * df_tonghop_ban['Đơn giá']
-                    df_tonghop_ban = df_tonghop_ban[['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
-                    df_tonghop_ban.insert(0, 'STT', range(1, len(df_tonghop_ban) + 1))
+                for col_num in ['Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']:
+                    df_input[col_num] = pd.to_numeric(df_input[col_num], errors='coerce').fillna(0)
+                
+                # PHÂN TÁCH MẢNG DỮ LIỆU ĐỂ XỬ LÝ
+                df_duong_goc = df_input[df_input['Số lượng'] > 0].copy()
+                df_am_goc = df_input[df_input['Số lượng'] < 0].copy()
+                
+                # --- THUẬT TOÁN 1: TỔNG HỢP MÃ HÀNG BÁN (Gom nhóm mảng dương, Đơn giá = Giá bìa) ---
+                if not df_duong_goc.empty:
+                    df_th_ban = df_duong_goc.groupby(['Mã số', 'Tên sách', 'ĐVT', 'Giá bìa'], as_index=False)['Số lượng'].sum()
+                    df_th_ban['CK'] = 0
+                    df_th_ban['Đơn giá'] = df_th_ban['Giá bìa']
+                    df_th_ban['Thành tiền'] = df_th_ban['Số lượng'] * df_th_ban['Đơn giá']
+                    df_th_ban = df_th_ban[['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
+                    df_th_ban.insert(0, 'STT', range(1, len(df_th_ban) + 1))
                 else:
-                    df_tonghop_ban = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
+                    df_th_ban = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
                 
-                # 2.2 Tổng hợp hàng trả (Chuyển đổi dấu âm sang dấu dương - Tính theo Giá bìa)
-                if not df_am.empty:
-                    df_tonghop_tra = df_am.copy()
-                    df_tonghop_tra['Số lượng'] = df_tonghop_tra['Số lượng'].abs()
-                    df_tonghop_tra = df_tonghop_tra.groupby(['Mã số', 'Tên sách', 'ĐVT', 'Giá bìa'], as_index=False).agg({'Số lượng': 'sum'})
-                    df_tonghop_tra['CK'] = 0
-                    df_tonghop_tra['Đơn giá'] = df_tonghop_tra['Giá bìa']
-                    df_tonghop_tra['Thành tiền'] = df_tonghop_tra['Số lượng'] * df_tonghop_tra['Đơn giá']
-                    df_tonghop_tra = df_tonghop_tra[['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
-                    df_tonghop_tra.insert(0, 'STT', range(1, len(df_tonghop_tra) + 1))
+                # --- THUẬT TOÁN 2: TỔNG HỢP MÃ HÀNG TRẢ (Gom nhóm mảng âm, đảo dấu thành Dương, Đơn giá = Giá bìa) ---
+                if not df_am_goc.empty:
+                    df_am_dao_dau = df_am_goc.copy()
+                    df_am_dao_dau['Số lượng'] = df_am_dao_dau['Số lượng'].abs()
                     
-                    # 2.3 Chi tiết hàng trả âm (Giữ nguyên dấu âm và tỷ lệ chiết khấu thực tế)
-                    df_chitiet_am = df_am.copy()
-                    df_chitiet_am['Thành tiền'] = df_chitiet_am['Số lượng'] * df_chitiet_am['Đơn giá']
-                    df_chitiet_am['STT'] = range(1, len(df_chitiet_am) + 1)
-                    df_chitiet_am = df_chitiet_am[['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
+                    df_th_tra = df_am_dao_dau.groupby(['Mã số', 'Tên sách', 'ĐVT', 'Giá bìa'], as_index=False)['Số lượng'].sum()
+                    df_th_tra['CK'] = 0
+                    df_th_tra['Đơn giá'] = df_th_tra['Giá bìa']
+                    df_th_tra['Thành tiền'] = df_th_tra['Số lượng'] * df_th_tra['Đơn giá']
+                    df_th_tra = df_th_tra[['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
+                    df_th_tra.insert(0, 'STT', range(1, len(df_th_tra) + 1))
+                    
+                    # --- THUẬT TOÁN 3: CHI TIẾT HÀNG TRẢ ÂM (Giữ nguyên dấu âm và chiết khấu thực tế) ---
+                    df_ct_am = df_am_goc.copy()
+                    df_ct_am['Thành tiền'] = df_ct_am['Số lượng'] * df_ct_am['Đơn giá']
+                    df_ct_am = df_ct_am[['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
+                    df_ct_am.insert(0, 'STT', range(1, len(df_ct_am) + 1))
                 else:
-                    df_tonghop_tra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
-                    df_chitiet_am = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
+                    df_th_tra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
+                    df_ct_am = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
                 
-                # 2.4 Toàn bộ mảng dữ liệu bán ra dương thực tế
-                df_tonghop_banra = df_duong.copy()
-                if not df_tonghop_banra.empty:
-                    df_tonghop_banra['Thành tiền'] = df_tonghop_banra['Số lượng'] * df_tonghop_banra['Đơn giá']
-                    df_tonghop_banra['STT'] = range(1, len(df_tonghop_banra) + 1)
-                    df_tonghop_banra = df_tonghop_banra[['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
+                # --- THUẬT TOÁN 4: CHI TIẾT TOÀN BỘ MẢNG BÁN RA DƯƠNG ---
+                df_th_banra = df_duong_goc.copy()
+                if not df_th_banra.empty:
+                    df_th_banra['Thành tiền'] = df_th_banra['Số lượng'] * df_th_banra['Đơn giá']
+                    df_th_banra = df_th_banra[['Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']]
+                    df_th_banra.insert(0, 'STT', range(1, len(df_th_banra) + 1))
                 else:
-                    df_tonghop_banra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
+                    df_th_banra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
 
-                # --- ĐÓNG GÓI RA FILE EXCEL MULTI-SHEETS ---
+                # --- ĐÓNG GÓI DỮ LIỆU VÀ XUẤT FILE EXCEL MULTI-SHEET ---
                 out_report = io.BytesIO()
                 with pd.ExcelWriter(out_report, engine='openpyxl') as writer:
-                    grand_summary_data = []
+                    grand_summary_list = []
                     
-                    def ghi_sheet_kem_tong(df, name, color, has_vat=False):
-                        df.to_excel(writer, index=False, sheet_name=name)
-                        ws = writer.sheets[name]
-                        r_idx = len(df) + 2
+                    def xu_ly_ghi_sheet(df_sheet, sheet_name, color_theme, has_vat=False):
+                        df_sheet.to_excel(writer, index=False, sheet_name=sheet_name)
+                        ws = writer.sheets[sheet_name]
                         
-                        sum_sl = df['Số lượng'].sum()
-                        sum_tt = df['Thành tiền'].sum()
+                        total_row = len(df_sheet) + 2
+                        sum_qty = df_sheet['Số lượng'].sum()
+                        sum_amount = df_sheet['Thành tiền'].sum()
                         
-                        ws.cell(row=r_idx, column=6).value = "Tổng cộng:"
-                        ws.cell(row=r_idx, column=7).value = sum_sl
-                        ws.cell(row=r_idx, column=9).value = sum_tt
+                        # Điền dòng tổng kết
+                        ws.cell(row=total_row, column=6).value = "Tổng cộng:"
+                        ws.cell(row=total_row, column=7).value = sum_qty
+                        ws.cell(row=total_row, column=9).value = sum_amount
                         
-                        vat, sau_thue = 0.0, 0.0
+                        v_tax, v_after_tax = 0.0, 0.0
                         if has_vat:
-                            vat = sum_tt * 0.05
-                            sau_thue = sum_tt * 1.05
-                            ws.cell(row=r_idx+1, column=8).value = "VAT 5%:"
-                            ws.cell(row=r_idx+1, column=9).value = vat
-                            ws.cell(row=r_idx+2, column=8).value = "Sau Thuế:"
-                            ws.cell(row=r_idx+2, column=9).value = sau_thue
+                            v_tax = sum_amount * 0.05
+                            v_after_tax = sum_amount * 1.05
+                            ws.cell(row=total_row + 1, column=8).value = "VAT 5%:"
+                            ws.cell(row=total_row + 1, column=9).value = v_tax
+                            ws.cell(row=total_row + 2, column=8).value = "Sau Thuế:"
+                            ws.cell(row=total_row + 2, column=9).value = v_after_tax
                             
-                        trang_tri_sheet(ws, color, has_vat_summary=has_vat)
-                        return len(df), sum_sl, sum_tt, vat, sau_thue
+                        trang_tri_sheet(ws, color_theme, has_vat_summary=has_vat)
+                        return len(df_sheet), sum_qty, sum_amount, v_tax, v_after_tax
 
-                    if not df_tonghop_ban.empty:
-                        ln, sl, tt, _, _ = ghi_sheet_kem_tong(df_tonghop_ban, "Tong_Hop_Ma_Hang_Ban", "003366")
-                        grand_summary_data.append(["Tong Hop Ma Hang Ban", "Duong", ln, sl, tt, 0, tt, "Gia Bia (Khong VAT)"])
+                    # Ghi các sheet tổng hợp cơ bản
+                    if not df_th_ban.empty:
+                        l, q, a, _, _ = xu_ly_ghi_sheet(df_th_ban, "Tong_Hop_Ma_Hang_Ban", "003366")
+                        grand_summary_list.append(["Tong Hop Ma Hang Ban", "Duong", l, q, a, 0, a, "Theo Giá Bìa Gốc"])
                         
-                    if not df_tonghop_tra.empty:
-                        ln, sl, tt, _, _ = ghi_sheet_kem_tong(df_tonghop_tra, "Tong_Hop_Hang_Tra", "FF6600")
-                        grand_summary_data.append(["Tong Hop Hang Tra", "Duong", ln, sl, tt, 0, tt, "Gia Bia (Khong VAT)"])
+                    if not df_th_tra.empty:
+                        l, q, a, _, _ = xu_ly_ghi_sheet(df_th_tra, "Tong_Hop_Hang_Tra", "FF6600")
+                        grand_summary_list.append(["Tong Hop Hang Tra", "Duong (Đảo dấu)", l, q, a, 0, a, "Theo Giá Bìa Gốc"])
                         
-                    if not df_chitiet_am.empty:
-                        ln, sl, tt, vt, st = ghi_sheet_kem_tong(df_chitiet_am, "Chi_Tiet_Am", "C00000", has_vat=True)
-                        grand_summary_data.append(["Chi Tiet Hang Tra", "Am", ln, sl, tt, vt, st, "Thuc te sau CK"])
+                    if not df_ct_am.empty:
+                        l, q, a, vt, st = xu_ly_ghi_sheet(df_ct_am, "Chi_Tiet_Am", "C00000", has_vat=True)
+                        grand_summary_list.append(["Chi Tiet Hang Tra", "Am", l, q, a, vt, st, "Thực tế sau Chiết Khấu"])
                         
-                    if not df_tonghop_banra.empty:
-                        ln, sl, tt, vt, st = ghi_sheet_kem_tong(df_tonghop_banra, "Tong_Hop_Ban_Ra", "00B050", has_vat=True)
-                        grand_summary_data.append(["Tong Hop Ban Ra", "Duong", ln, sl, tt, vt, st, "Toan bo du lieu duong"])
+                    if not df_th_banra.empty:
+                        l, q, a, vt, st = xu_ly_ghi_sheet(df_th_banra, "Tong_Hop_Ban_Ra", "00B050", has_vat=True)
+                        grand_summary_list.append(["Tong Hop Ban Ra", "Duong", l, q, a, vt, st, "Thực tế sau Chiết Khấu"])
 
-                    # Phân tách nhỏ hóa đơn (1000 dòng/sheet)
+                    # --- THUẬT TOÁN 5: TỰ ĐỘNG CHẶT NHỎ HÓA ĐƠN 1000 DÒNG ---
                     batch_size = 1000
-                    sheet_index = 1
-                    if not df_tonghop_banra.empty:
-                        for i in range(0, len(df_tonghop_banra), batch_size):
-                            df_batch = df_tonghop_banra.iloc[i:i+batch_size].copy()
+                    hd_index = 1
+                    if not df_th_banra.empty:
+                        for start_idx in range(0, len(df_th_banra), batch_size):
+                            df_batch = df_th_banra.iloc[start_idx : start_idx + batch_size].copy()
                             df_batch['STT'] = range(1, len(df_batch) + 1)
-                            hd_name = f"HD {sheet_index}"
-                            ln, sl, tt, vt, st = ghi_sheet_kem_tong(df_batch, hd_name, "0070C0", has_vat=True)
-                            grand_summary_data.append([f"Hoa Don {sheet_index}", "Duong", ln, sl, tt, vt, st, "Tach le 1000 dong"])
-                            sheet_index += 1
+                            
+                            sheet_hd_name = f"HD {hd_index}"
+                            l, q, a, vt, st = xu_ly_ghi_sheet(df_batch, sheet_hd_name, "0070C0", has_vat=True)
+                            grand_summary_list.append([f"Hoa Don {hd_index}", "Duong Split", l, q, a, vt, st, "Tách lẻ quy chuẩn 1000 dòng"])
+                            hd_index += 1
 
-                    # Báo cáo tổng quan Dashboard
-                    df_grand = pd.DataFrame(grand_summary_data, columns=["Ten Sheet / Hang muc", "Loai", "So dong", "So luong", "Truoc Thue", "VAT (5%)", "Sau Thue", "Ghi chu"])
-                    df_grand.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
+                    # --- THUẬT TOÁN 6: XÂY DỰNG TRANG DASHBOARD ĐỐI SOÁT TỔNG ---
+                    df_grand_final = pd.DataFrame(grand_summary_list, columns=["Ten Sheet / Hang muc", "Loai", "So dong", "So luong", "Truoc Thue", "VAT (5%)", "Sau Thue", "Ghi chu"])
+                    df_grand_final.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
                     ws_grand = writer.sheets["Tong_Ket_Chung"]
                     
-                    thuong_sl = df_tonghop_banra['Số lượng'].sum() + df_chitiet_am['Số lượng'].sum() if not df_chitiet_am.empty else df_tonghop_banra['Số lượng'].sum()
-                    thuong_tt = df_tonghop_banra['Thành tiền'].sum() + df_chitiet_am['Thành tiền'].sum() if not df_chitiet_am.empty else df_tonghop_banra['Thành tiền'].sum()
-                    thuong_vat = thuong_tt * 0.05
-                    thuong_st = thuong_tt * 1.05
+                    # Tính toán Doanh thu thuần thực tế sau khi bù trừ xuất - trả toàn cục
+                    net_qty = df_th_banra['Số lượng'].sum() + df_ct_am['Số lượng'].sum()
+                    net_amount = df_th_banra['Thành tiền'].sum() + df_ct_am['Thành tiền'].sum()
+                    net_vat = net_amount * 0.05
+                    net_after_tax = net_amount * 1.05
                     
-                    r_grand = len(df_grand) + 2
-                    ws_grand.cell(row=r_grand, column=1).value = "DOANH THU THUC TE (BAN - TRA)"
-                    ws_grand.cell(row=r_grand, column=4).value = thuong_sl
-                    ws_grand.cell(row=r_grand, column=5).value = thuong_tt
-                    ws_grand.cell(row=r_grand, column=6).value = thuong_vat
-                    ws_grand.cell(row=r_grand, column=7).value = thuong_st
+                    r_grand_total = len(df_grand_final) + 2
+                    ws_grand.cell(row=r_grand_total, column=1).value = "DOANH THU THUC TE (BAN - TRA)"
+                    ws_grand.cell(row=r_grand_total, column=4).value = net_qty
+                    ws_grand.cell(row=r_grand_total, column=5).value = net_amount
+                    ws_grand.cell(row=r_grand_total, column=6).value = net_vat
+                    ws_grand.cell(row=r_grand_total, column=7).value = net_after_tax
                     
                     trang_tri_sheet(ws_grand, "000000", total_row_type="grand")
                     
+                    # Đẩy sheet tổng kết doanh thu lên vị trí đầu tiên trong file Excel
                     wb = writer.book
-                    order = [wb.sheetnames[-1]] + wb.sheetnames[:-1]
-                    wb._sheets = [wb._sheets[wb.sheetnames.index(name)] for name in order]
+                    sheets_order = [wb.sheetnames[-1]] + wb.sheetnames[:-1]
+                    wb._sheets = [wb._sheets[wb.sheetnames.index(name)] for name in sheets_order]
 
-                st.success("🎉 PHÂN TÍCH TÍNH TOÁN MASTER REPORT THÀNH CÔNG RỰC RỠ!")
+                st.success("🎉 PHÂN TÍCH TÍNH TOÁN MASTER REPORT THÀNH CÔNG!")
                 
-                tab_res1, tab_res2, tab_res3, tab_res4 = st.tabs(["📋 Bảng Tổng Kết Doanh Thu", "📈 Tổng Hợp Mã Bán", "📉 Tổng Hợp Mã Trả", "📦 Chi Tiết Hàng Âm"])
-                with tab_res1:
-                    st.dataframe(df_grand, use_container_width=True)
-                    st.metric(label="Doanh Thu Thuần Thực Tế Đối Soát Hệ Thống (Sau Thuế)", value=f"{thuong_st:,.0f} đ")
-                with tab_res2:
-                    st.dataframe(df_tonghop_ban, use_container_width=True)
-                with tab_res3:
-                    st.dataframe(df_tonghop_tra, use_container_width=True)
-                with tab_res4:
-                    st.dataframe(df_chitiet_am, use_container_width=True)
+                # Hiển thị trực quan dữ liệu lên giao diện Streamlit
+                t1, t2, t3, t4 = st.tabs(["📋 Bảng Doanh Thu Thuần", "📈 Tổng Hợp Mã Bán", "📉 Tổng Hợp Mã Trả", "📦 Chi Tiết Hàng Trả"])
+                with t1:
+                    st.dataframe(df_grand_final, use_container_width=True)
+                    st.metric(label="Doanh Thu Thuần Thực Tế Cuối Cùng (Sau Thuế 5%)", value=f"{net_after_tax:,.0f} đ")
+                with t2:
+                    st.dataframe(df_th_ban, use_container_width=True)
+                with t3:
+                    st.dataframe(df_th_tra, use_container_width=True)
+                with t4:
+                    st.dataframe(df_ct_am, use_container_width=True)
 
                 st.download_button(
                     label="📥 TẢI FILE EXCEL MASTER REPORT CUỐI CÙNG",
@@ -331,4 +347,4 @@ with tab_giai_doan_2:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
             except Exception as e:
-                st.error(f"Lỗi xảy ra ở Giai đoạn 2: {str(e)}")
+                st.error(f"Lỗi xảy ra ở thuật toán xử lý Giai đoạn 2: {str(e)}")
