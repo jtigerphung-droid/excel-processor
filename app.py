@@ -1,21 +1,23 @@
 import streamlit as st
 import pandas as pd
 import io
+import re
 from datetime import datetime
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# --- CẤU HÌNH GIAO DIỆN WEB ---
+# --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
 st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
 st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
-st.write("Phiên bản Vá Lỗi Khớp Cột (Column Mismatch): Tự động bù cột thiếu hụt và phân tách 2 giai đoạn.")
+st.write("Phiên bản khôi phục thuật toán ổn định trước Bước 2 - Phân tách 2 Giai đoạn độc lập.")
 
-# --- HÀM TRANG TRÍ EXCEL QUY CHUẨN ---
+# --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
     font_tieude = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_tieude = PatternFill(start_color=tieude_color, end_color=tieude_color, fill_type="solid")
     font_noidung = Font(name="Arial", size=10)
     font_tongket = Font(name="Arial", size=10, bold=True)
+    
     vien_mong = Side(border_style="thin", color="D9D9D9")
     border_o = Border(left=vien_mong, right=vien_mong, top=vien_mong, bottom=vien_mong)
     
@@ -30,16 +32,23 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
     max_r = worksheet.max_row
     for row_idx in range(2, max_r + 1):
         worksheet.row_dimensions[row_idx].height = 19
-        is_total_row = (total_row_type == "grand" and row_idx == max_r) or \
-                       (total_row_type == "standard" and has_vat_summary and row_idx >= max_r - 2) or \
-                       (total_row_type == "standard" and not has_vat_summary and row_idx == max_r)
         
+        is_total_row = False
+        if total_row_type == "grand" and row_idx == max_r:
+            is_total_row = True
+        elif total_row_type == "standard" and has_vat_summary and row_idx >= max_r - 2:
+            is_total_row = True
+        elif total_row_type == "standard" and not has_vat_summary and row_idx == max_r:
+            is_total_row = True
+
         for col_idx in range(1, worksheet.max_column + 1):
             cell = worksheet.cell(row=row_idx, column=col_idx)
             cell.border = border_o
+            
             if is_total_row:
                 cell.font = font_tongket
-                if total_row_type == "grand": cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+                if total_row_type == "grand":
+                    cell.fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
             else:
                 cell.font = font_noidung
 
@@ -60,107 +69,119 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
         worksheet.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
 
-# --- ĐIỀU HƯỚNG 2 GIAI ĐOẠN QUA TAB ---
-tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch File Thô", "🧮 GIAI ĐOẠN 2: Tính Toán Master Process"])
+# --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB ---
+tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch (Bản Ổn Định)", "🧮 GIAI ĐOẠN 2: Tính Toán Master Process"])
 
 # ==========================================================================================
-# GIAI ĐOẠN 1: GỘP VÀ LÀM SẠCH DỮ LIỆU THÔ (VÁ LỖI THIẾU CỘT VẬT LÝ)
+# GIAI ĐOẠN 1: KHÔI PHỤC NGUYÊN BẢN CODE CHẠY HOÀN CHỈNH TRƯỚC ĐÓ
 # ==========================================================================================
 with tab_giai_doan_1:
-    st.header("Bước 1: Gộp Nhiều Sheet & Loại Bỏ 100% Dòng Rác")
-    st.info("Tính năng này tự động chuẩn hóa số lượng cột, gộp các sheet và loại bỏ toàn bộ dòng rác, dòng tiêu đề lặp lại.")
+    st.header("Bước 1: Gộp Nhiều Sheet & Làm Sạch Diện Rộng")
+    st.info("Sử dụng thuật toán dò quét gốc đã chạy ra kết quả chuẩn xác của bạn.")
     
-    file_tho = st.file_uploader("Tải lên file Excel THÔ (File có nhiều sheet hệ thống):", type=["xlsx"], key="file_tho")
-    
-    if file_tho is not None:
-        if st.button("🛠️ THỰC HIỆN GỘP VÀ LÀM SẠCH DỮ LIỆU"):
+    uploaded_file = st.file_uploader("Kéo thả file Excel thô của hệ thống vào đây:", type=["xlsx"], key="file_tho_goc")
+
+    if uploaded_file is not None:
+        if st.button("🚀 THỰC HIỆN GỘP VÀ LÀM SẠCH PHIÊN BẢN CHUẨN"):
             try:
-                excel_file = pd.ExcelFile(file_tho)
-                list_df_sheets = []
+                excel_file = pd.ExcelFile(uploaded_file)
+                all_cleaned_rows = []
                 
                 for sheet_name in excel_file.sheet_names:
-                    # Đọc toàn bộ dữ liệu dưới dạng chuỗi văn bản thô
-                    df_raw = pd.read_excel(excel_file, sheet_name=sheet_name, header=None).astype(str)
-                    if df_raw.empty: continue
+                    df_raw_sheet = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
+                    if df_raw_sheet.empty: continue
                     
-                    # Tìm dòng chứa tiêu đề mấu chốt để xác định điểm cắt dữ liệu
-                    header_row_idx = None
-                    for idx, row in df_raw.iterrows():
-                        row_list = row.str.strip().tolist()
-                        if any("Mã số" in s or "Tên sách" in s for s in row_list):
-                            header_row_idx = idx
-                            break
-                    
-                    # Cắt lấy phần nội dung phía dưới dòng tiêu đề tìm được
-                    if header_row_idx is not None:
-                        df_data = df_raw.iloc[header_row_idx + 1:].copy()
-                    else:
-                        df_data = df_raw.iloc[8:].copy()
-                    
-                    # THUẬT TOÁN BÙ CỘT THÔNG MINH: Đảm bảo bảng luôn có ít nhất 9 cột trước khi gán tên
-                    current_cols = df_data.shape[1]
-                    if current_cols < 9:
-                        for c_add in range(9 - current_cols):
-                            df_data[f"custom_col_add_{c_add}"] = "0"  # Thêm cột trống định dạng chuỗi
-                    
-                    # Trích xuất chuẩn xác 9 cột từ chỉ số 0 đến 8
-                    df_data = df_data.iloc[:, 0:9]
-                    df_data.columns = ['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']
-                    list_df_sheets.append(df_data)
-                
-                if not list_df_sheets:
-                    st.error("Không tìm thấy dữ liệu hợp lệ trong các sheet.")
-                    st.stop()
+                    for idx, row in df_raw_sheet.iterrows():
+                        row_vals = row.fillna("").astype(str).str.strip().tolist()
+                        
+                        if not row_vals or len(row_vals) < 7: continue
+                        if any(k in "".join(row_vals) for k in ["Tổng cộng", "Thuế VAT", "Thành tiền", "Người lập", "Thủ kho", "Giám đốc"]): continue
+                        if "Mã số" in row_vals or "Tên sách" in row_vals or "STT" in row_vals: continue
+                        
+                        idx_ma = -1
+                        idx_ten = -1
+                        
+                        for c_i, val in enumerate(row_vals):
+                            if val and not " " in val and len(val) >= 4 and idx_ma == -1:
+                                if re.match(r'^[A-Za-z0-9\-_.]+$', val): idx_ma = c_i
+                            elif val and " " in val and len(val) > 10 and idx_ten == -1:
+                                idx_ten = c_i
+                        
+                        if idx_ma == -1 or idx_ten == -1:
+                            if row_vals[0].isdigit() or (row_vals[2] != "" and len(row_vals[2]) >= 4):
+                                idx_ma = 2
+                                idx_ten = 1
+                            else:
+                                continue
+                                
+                        try:
+                            base_idx = min(idx_ten, idx_ma)
+                            if base_idx > 0 and row_vals[base_idx-1].isdigit():
+                                stt_val = row_vals[base_idx-1]
+                            else:
+                                stt_val = ""
+                                
+                            ten_sach = row_vals[idx_ten]
+                            ma_so = row_vals[idx_ma]
+                            dvt = row_vals[idx_ma + 1] if (idx_ma + 1) < len(row_vals) else "Cuốn"
+                            
+                            num_fields = []
+                            for v in row_vals[idx_ma + 2:]:
+                                if v == "" or v == "nan": num_fields.append(0)
+                                else:
+                                    v_clean = v.replace(",", "").replace(".", "").strip()
+                                    if v_clean.replace("-", "").isdigit(): num_fields.append(float(v_clean))
+                                    else: num_fields.append(0)
+                                    
+                            while len(num_fields) < 5: num_fields.append(0)
+                            
+                            gia_bia = num_fields[0]
+                            ck = num_fields[1]
+                            sl = num_fields[2]
+                            don_gia = num_fields[3]
+                            thanh_tien = num_fields[4]
+                            
+                            if sl == 0 or ma_so == "" or ma_so == "nan": continue
+                            
+                            all_cleaned_rows.append([
+                                stt_val, ten_sach, ma_so, dvt, gia_bia, ck, sl, don_gia, thanh_tien
+                            ])
+                        except Exception:
+                            continue
 
-                # Tiến hành gộp dữ liệu diện rộng
-                df_combined = pd.concat(list_df_sheets, ignore_index=True)
+                if not all_cleaned_rows:
+                    st.error("❌ LỖI: Không trích xuất được dòng dữ liệu sách hợp lệ nào.")
+                    st.stop()
+                    
+                df_master = pd.DataFrame(all_cleaned_rows, columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
+                df_master['STT'] = range(1, len(df_master) + 1)
                 
-                # Làm sạch khoảng trắng dư thừa
-                for col in df_combined.columns:
-                    df_combined[col] = df_combined[col].str.strip()
-                
-                # Loại bỏ các dòng trống hoặc mã trống không hợp lệ
-                df_combined = df_combined[df_combined['Mã số'].notna() & (df_combined['Mã số'] != '') & (df_combined['Mã số'] != 'nan') & (df_combined['Mã số'] != 'Mã số')]
-                
-                # Bộ lọc triệt tiêu các từ khóa dòng tổng kết trung gian và dòng chữ ký kế toán
-                tu_khoa_xoa = ['Tổng cộng:', 'Thuế VAT:', 'Thành tiền:', 'Tổng cộng', 'Thuế VAT', 'Phụ trách cung tiêu', 'Người giao hàng', 'Thủ Kho', 'nan', 'STT', 'Tên sách', 'Cộng trước:', 'Cộng trước', 'Người lập']
-                df_combined = df_combined[~df_combined['Tên sách'].isin(tu_khoa_xoa)]
-                df_combined = df_combined[~df_combined['Mã số'].isin(tu_khoa_xoa)]
-                
-                # Ép toàn bộ định dạng tiền tệ và số lượng về dạng số xử lý được
-                for col in ['Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']:
-                    df_combined[col] = pd.to_numeric(df_combined[col].str.replace(',', '').str.replace('.', ''), errors='coerce').fillna(0)
-                
-                # Loại bỏ dòng không có biến động số lượng phát hành
-                df_combined = df_combined[df_combined['Số lượng'] != 0]
-                df_combined['STT'] = range(1, len(df_combined) + 1)
-                
-                # Khởi tạo tệp tin xuất ra cho Giai đoạn 2
+                # Xuất file sạch
                 out_sach = io.BytesIO()
                 with pd.ExcelWriter(out_sach, engine='openpyxl') as writer:
-                    df_combined.to_excel(writer, index=False, sheet_name="Du_Lieu_Sach_100")
+                    df_master.to_excel(writer, index=False, sheet_name="Du_Lieu_Sach_100")
                     trang_tri_sheet(writer.sheets["Du_Lieu_Sach_100"], "003366")
-                
-                st.success("🎉 GIAI ĐOẠN 1 HOÀN THÀNH: ĐÃ GỘP VÀ LÀM SẠCH 100% FILE DỮ LIỆU THÔ!")
-                st.dataframe(df_combined, use_container_width=True)
+                    
+                st.success("🎉 GIAI ĐOẠN 1 HOÀN THÀNH: PHỤC HỒI KẾT QUẢ CHUẨN THÀNH CÔNG!")
+                st.dataframe(df_master, use_container_width=True)
                 
                 st.download_button(
                     label="📥 TẢI FILE DỮ LIỆU SẠCH (Dùng cho Giai đoạn 2)",
                     data=out_sach.getvalue(),
-                    file_name=f"DuLieu_Gop_Va_LamSach_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    file_name=f"DuLieu_Gop_Va_LamSach_Chuan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
             except Exception as e:
-                st.error(f"Lỗi xảy ra ở Giai đoạn 1: {str(e)}")
+                st.error(f"Lỗi hệ thống phục hồi: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: TÍNH TOÁN VÀ PHÂN TÍCH MASTER PROCESS (TƯƠNG ĐƯƠNG FILE B3.BAS)
+# GIAI ĐOẠN 2: TÍNH TOÁN DỰA TRÊN FILE SẠCH KHÔNG ĐỤNG CHẠM CODE BƯỚC 1
 # ==========================================================================================
 with tab_giai_doan_2:
     st.header("Bước 2: Phân Tích Danh Mục, Xử Lý Âm Dương & Tách Hóa Đơn")
-    st.warning("⚠️ LƯU Ý: Vui lòng nạp file Excel đã được LÀM SẠCH tải ra từ Giai đoạn 1 vào đây để tính toán.")
+    st.warning("⚠️ LƯU Ý: Nạp file Excel 'DuLieu_Gop_Va_LamSach_Chuan_...' tải từ Giai đoạn 1 vào đây.")
     
-    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH:", type=["xlsx"], key="file_sach")
+    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="file_sach_sach")
     
     if file_sach is not None:
         if st.button("🧮 KHỞI CHẠY THUẬT TOÁN TÍNH TOÁN MASTER REPORT"):
@@ -210,7 +231,7 @@ with tab_giai_doan_2:
                 else:
                     df_tonghop_banra = pd.DataFrame(columns=['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền'])
 
-                # --- BƯỚC 3: ĐÓNG GÓI RA FILE EXCEL MULTI-SHEETS ---
+                # --- ĐÓNG GÓI RA FILE EXCEL MULTI-SHEETS ---
                 out_report = io.BytesIO()
                 with pd.ExcelWriter(out_report, engine='openpyxl') as writer:
                     grand_summary_data = []
@@ -255,7 +276,7 @@ with tab_giai_doan_2:
                         ln, sl, tt, vt, st = ghi_sheet_kem_tong(df_tonghop_banra, "Tong_Hop_Ban_Ra", "00B050", has_vat=True)
                         grand_summary_data.append(["Tong Hop Ban Ra", "Duong", ln, sl, tt, vt, st, "Toan bo du lieu duong"])
 
-                    # Phân tách nhỏ hóa đơn (Batch Size = 1000 dòng theo file .bas)
+                    # Phân tách nhỏ hóa đơn (1000 dòng/sheet)
                     batch_size = 1000
                     sheet_index = 1
                     if not df_tonghop_banra.empty:
@@ -267,7 +288,7 @@ with tab_giai_doan_2:
                             grand_summary_data.append([f"Hoa Don {sheet_index}", "Duong", ln, sl, tt, vt, st, "Tach le 1000 dong"])
                             sheet_index += 1
 
-                    # Báo cáo tổng quan Dashboard đưa lên trang đầu
+                    # Báo cáo tổng quan Dashboard
                     df_grand = pd.DataFrame(grand_summary_data, columns=["Ten Sheet / Hang muc", "Loai", "So dong", "So luong", "Truoc Thue", "VAT (5%)", "Sau Thue", "Ghi chu"])
                     df_grand.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
                     ws_grand = writer.sheets["Tong_Ket_Chung"]
