@@ -87,7 +87,7 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
         worksheet.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
 
-# --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB (THIẾT KẾ LẠI ICON TRỰC QUAN) ---
+# --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB ---
 tab_giai_doan_1, tab_giai_doan_2, tab_giai_doan_3 = st.tabs([
     "📥 GIAI ĐOẠN 1: Gộp & Làm Sạch Dữ Liệu", 
     "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21",
@@ -184,7 +184,6 @@ with tab_giai_doan_1:
                     df_master.to_excel(writer, index=False, sheet_name="Du_Lieu_Sach_100")
                     trang_tri_sheet(writer.sheets["Du_Lieu_Sach_100"], "003366")
                 
-                # THIẾT KẾ CARD THÔNG SỐ TỔNG QUAN GIỐNG MẪU DASHBOARD
                 st.markdown("#### ✨ KẾT QUẢ ĐÃ TRÍCH XUẤT THÀNH CÔNG")
                 c1, c2 = st.columns(2)
                 with c1:
@@ -206,7 +205,7 @@ with tab_giai_doan_1:
                 st.error(f"Lỗi hệ thống G1: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: TÍNH TOÁN PHÂN TÁCH PAB21 (GIAO DIỆN HIỆN ĐẠI HÓA)
+# GIAI ĐOẠN 2: TÍNH TOÁN PHÂN TÁCH PAB21 (CÓ THÊM CARD SAU THUẾ & ĐỔI SANG 'CUỐN')
 # ==========================================================================================
 with tab_giai_doan_2:
     st.markdown("### 🏛️ Phân tách ma trận thuộc tính doanh thu PAB21 & Tô màu định dạng")
@@ -343,17 +342,19 @@ with tab_giai_doan_2:
                     wb = writer.book
                     wb._sheets = [wb._sheets[wb.sheetnames.index(n)] for n in (["Tong_Ket_Chung"] + [sn for sn in wb.sheetnames if sn != "Tong_Ket_Chung"])]
 
-                # GIAO DIỆN KHỐI KPI TỔNG QUAN HIỆN ĐẠI (GIỐNG HÌNH CHỤP MẪU)
+                # GIAO DIỆN KHỐI KPI TỔNG QUAN HIỆN ĐẠI (ĐÃ SỬA ĐƠN VỊ TÍNH VÀ THÊM KHỐI SAU THUẾ)
                 st.markdown("#### 📊 TỔNG HỢP BIẾN ĐỘNG DOANH THU HỆ THỐNG")
-                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+                kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
                 with kpi1:
-                    st.metric(label="Tổng Sản Lượng Thực Tế", value=f"{int(net_q):,} cp")
+                    st.metric(label="Tổng Sản Lượng Thực Tế", value=f"{int(net_q):,} cuốn")
                 with kpi2:
                     st.metric(label="Doanh Thu Trước Thuế (Net)", value=f"{net_a:,.0f} đ")
                 with kpi3:
                     st.metric(label="Tổng Thuế GTGT VAT (5%)", value=f"{net_v:,.0f} đ")
                 with kpi4:
-                    st.metric(label="Số lượng HĐ tách (Max 1k dòng)", value=f"{num_invoices} file", delta="Sẵn sàng xuất")
+                    st.metric(label="Tổng Cộng Sau Thuế (Gross)", value=f"{net_s:,.0f} đ")
+                with kpi5:
+                    st.metric(label="Số lượng HĐ tách", value=f"{num_invoices} file", delta="Sẵn sàng xuất")
                 
                 st.success("🎉 THUẬT TOÁN ĐÃ PHÂN TÁCH XONG MA TRẬN SHEET TAB!")
                 st.dataframe(df_sum, use_container_width=True)
@@ -440,7 +441,7 @@ with tab_giai_doan_3:
                     st.warning("⚠️ Hệ thống không phát hiện dữ liệu hóa đơn dạng tách hợp lệ.")
                     st.stop()
                     
-                st.balloons() # Hiệu ứng bóng bay chúc mừng chuyên nghiệp khi hoàn thành tác vụ nặng
+                st.balloons()
                 st.success(f"🔥 XUẤT HOÀN TẤT: Đã tạo thành công bộ {success_count} hóa đơn điện tử chuẩn mẫu Viettel!")
                 
                 st.markdown('<div style="margin-top:15px;"></div>', unsafe_allow_html=True)
