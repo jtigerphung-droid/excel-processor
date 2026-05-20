@@ -9,8 +9,8 @@ from openpyxl.utils import get_column_letter
 import zipfile
 
 # --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
-st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
-st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
+st.set_page_config(page_title="Hệ thống xử lý dữ liệu 3 Giai Đoạn", layout="wide")
+st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU")
 st.write("Phiên bản CODE1_V4 - Phiên bản chuẩn hóa logic phân tách PAB21 và tô màu tab sheet")
 
 # --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
