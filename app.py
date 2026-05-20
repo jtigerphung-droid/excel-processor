@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 # --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
 st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
 st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
-st.write("Phiên bản kiến trúc PAB21 - Bảo toàn nguyên bản dữ liệu gốc & Tọa độ ô tĩnh.")
+st.write("Phiên bản CODE1 Nâng Cấp - Bổ sung TH Hàng Trả Giá Bìa & Tô màu Tab Sheet.")
 
 # --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
@@ -62,11 +62,10 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             elif col_idx == 6:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
-                # Nếu là sheet tổng kết chung, cột số dòng/số lượng định dạng số nguyên, trước thuế định dạng tiền tệ
                 if total_row_type == "grand":
                     cell.number_format = "#,##0"
                 else:
-                    cell.number_format = "0.00"  # Giữ nguyên định dạng số thô chiết khấu
+                    cell.number_format = "0.00"
             else:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 cell.number_format = "#,##0"
@@ -78,7 +77,7 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
 
 
 # --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB ---
-tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch (Bảo Lưu Gốc)", "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21"])
+tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch (Bảo Lưu)", "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21"])
 
 # ==========================================================================================
 # GIAI ĐOẠN 1: BẢO LƯU NGUYÊN BẢN 100% CODE GỐC CHẠY HOÀN CHỈNH CỦA USER
@@ -182,254 +181,150 @@ with tab_giai_doan_1:
                 st.error(f"Lỗi hệ thống G1: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: KIẾN TRÚC MÃ NGUỒN THEO PHƯƠNG PHÁP PAB21 (TỌA ĐỘ Ô TUYỆT ĐỐI)
+# GIAI ĐOẠN 2: KIẾN TRÚC MÃ NGUỒN THEO PHƯƠNG PHÁP PAB21 (CẬP NHẬT TÔ MÀU TAB & SHEET MỚI)
 # ==========================================================================================
 with tab_giai_doan_2:
-    st.header("Bước 2: Triển Khai Thuật Toán Đối Soát Mảng Phẳng PAB21")
-    st.warning("⚠️ ĐIỀU KIỆN: Nạp chính xác file Excel kết quả 'Du_Lieu_Sach_100' từ Giai đoạn 1.")
+    st.header("Bước 2: Phân Tách Thuộc Tính & Tô Màu Tab Sheet PAB21")
     
-    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="file_sach_pab21")
+    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="file_sach_pab21_v2")
     
     if file_sach is not None:
-        if st.button("🧮 KHỞI CHẠY KIẾN TRÚC TÍNH TOÁN PAB21"):
+        if st.button("🧮 KHỞI CHẠY KIẾN TRÚC TÍNH TOÁN NÂNG CẤP"):
             try:
-                # DÙNG OPENPYXL ĐỂ ĐỌC Ô TĨNH TUYỆT ĐỐI - TRIỆT TIÊU HOÀN TOÀN LỖI PANDAS TỰ ĐOÁN
                 wb_in = openpyxl.load_workbook(file_sach, data_only=True)
                 if "Du_Lieu_Sach_100" not in wb_in.sheetnames:
-                    st.error("❌ LỖI: File nạp vào không chứa sheet 'Du_Lieu_Sach_100' tiêu chuẩn.")
+                    st.error("❌ LỖI: File không chứa sheet 'Du_Lieu_Sach_100'.")
                     st.stop()
-                    
                 ws_in = wb_in["Du_Lieu_Sach_100"]
                 
                 mảng_bán_dương = []
                 mảng_trả_âm = []
                 
-                # Duyệt tuyến tính qua mảng phẳng từ dòng số 2 đến hết bảng tính
                 for row_idx in range(2, ws_in.max_row + 1):
-                    # Đọc dữ liệu thô theo đúng định vị cột cố định từ 1 đến 9 (A đến I)
-                    val_stt   = ws_in.cell(row=row_idx, column=1).value
-                    val_ten   = str(ws_in.cell(row=row_idx, column=2).value or "").strip()
-                    val_ma    = str(ws_in.cell(row=row_idx, column=3).value or "").strip()
-                    val_dvt   = str(ws_in.cell(row=row_idx, column=4).value or "Cuốn").strip()
+                    row_vals = [ws_in.cell(row=row_idx, column=c).value for c in range(1, 10)]
+                    if not row_vals[2] or row_vals[2] == "None": continue # Bỏ qua nếu mã hàng rỗng
                     
-                    try: val_bia = float(ws_in.cell(row=row_idx, column=5).value or 0)
-                    except: val_bia = 0.0
+                    # Chuẩn hóa dữ liệu thô
+                    val_sl = float(row_vals[6] or 0)
+                    if val_sl == 0: continue
                     
-                    try: val_ck = float(ws_in.cell(row=row_idx, column=6).value or 0)
-                    except: val_ck = 0.0
-                        
-                    try: val_sl = float(ws_in.cell(row=row_idx, column=7).value or 0)
-                    except: val_sl = 0.0
-                        
-                    try: val_dg = float(ws_in.cell(row=row_idx, column=8).value or 0)
-                    except: val_dg = 0.0
-                        
-                    try: val_tt = float(ws_in.cell(row=row_idx, column=9).value or 0)
-                    except: val_tt = 0.0
+                    formatted_row = [
+                        row_vals[0], str(row_vals[1] or ""), str(row_vals[2]), str(row_vals[3] or "Cuốn"),
+                        float(row_vals[4] or 0), float(row_vals[5] or 0), val_sl, 
+                        float(row_vals[7] or 0), float(row_vals[8] or 0)
+                    ]
                     
-                    # Bỏ qua dòng trống hoặc dòng rác không có mã hàng
-                    if not val_ma or val_ma == "None" or val_sl == 0:
-                        continue
-                        
-                    dòng_dữ_liệu = [val_stt, val_ten, val_ma, val_dvt, val_bia, val_ck, val_sl, val_dg, val_tt]
-                    
-                    # BỘ LỌC BƯỚC ĐỆM PAB21: PHÂN LOẠI ĐỘC LẬP THEO DẤU SỐ LƯỢNG
-                    if val_sl > 0:
-                        mảng_bán_dương.append(dòng_dữ_liệu)
-                    else:
-                        # BẢO TOÀN DẤU ÂM: Giữ nguyên toàn bộ dấu âm của dữ liệu gốc, không chuyển dương
-                        mảng_trả_âm.append(dòng_dữ_liệu)
+                    if val_sl > 0: mảng_bán_dương.append(formatted_row)
+                    else: mảng_trả_âm.append(formatted_row)
 
-                # --- 1. PHÉP TÍNH SHEET TỔNG HỢP HÀNG BÁN THEO GIÁ BÌA (Mảng Dương, Lọc trùng theo Mã) ---
-                dic_gia_bia = {}
+                # --- 1. TH GIÁ BÌA BÁN (DƯƠNG) ---
+                dic_gia_bia_ban = {}
                 for r in mảng_bán_dương:
-                    ma_hang = r[2]
-                    ten_hang = r[1]
-                    dvt_hang = r[3]
-                    gia_bia = r[4]
-                    sl_hang = r[6]
-                    
-                    if ma_hang not in dic_gia_bia:
-                        dic_gia_bia[ma_hang] = {"ten": ten_hang, "dvt": dvt_hang, "bia": gia_bia, "sl": 0.0}
-                    dic_gia_bia[ma_hang]["sl"] += sl_hang
+                    ma = r[2]
+                    if ma not in dic_gia_bia_ban: dic_gia_bia_ban[ma] = {"ten": r[1], "dvt": r[3], "bia": r[4], "sl": 0.0}
+                    dic_gia_bia_ban[ma]["sl"] += r[6]
+                bảng_gia_bia_ban = [[i+1, v["ten"], k, v["dvt"], v["bia"], 0.0, v["sl"], v["bia"], v["sl"]*v["bia"]] for i, (k, v) in enumerate(dic_gia_bia_ban.items())]
 
-                bảng_gia_bia = []
-                for idx, (ma, item) in enumerate(dic_gia_bia.items(), 1):
-                    tt_bia = item["sl"] * item["bia"]
-                    bảng_gia_bia.append([idx, item["ten"], ma, item["dvt"], item["bia"], 0.0, item["sl"], item["bia"], tt_bia])
-
-                # --- 2. PHÉP TÍNH SHEET TỔNG HỢP HÀNG BÁN THEO CHIẾT KHẤU (Mảng Dương, Lọc trùng Mã + CK, Bảo toàn Đơn giá gốc) ---
-                dic_chiet_khau = {}
-                for r in mảng_bán_dương:
-                    ma_hang = r[2]
-                    ten_hang = r[1]
-                    dvt_hang = r[3]
-                    gia_bia = r[4]
-                    ck_hang = r[5]  # Giữ nguyên định dạng số gốc (Ví dụ 0.3 hoặc 30)
-                    sl_hang = r[6]
-                    dg_goc = r[7]   # Bốc nguyên văn đơn giá gốc từ file thô sang
-                    
-                    key_composite = f"{ma_hang}_{ck_hang}"
-                    if key_composite not in dic_chiet_khau:
-                        dic_chiet_khau[key_composite] = {
-                            "ten": ten_hang, "ma": ma_hang, "dvt": dvt_hang, 
-                            "bia": gia_bia, "ck": ck_hang, "sl": 0.0, "dg": dg_goc
-                        }
-                    dic_chiet_khau[key_composite]["sl"] += sl_hang
-
-                bảng_chiet_khau = []
-                for idx, (k, item) in enumerate(dic_chiet_khau.items(), 1):
-                    tt_ck = item["sl"] * item["dg"]
-                    bảng_chiet_khau.append([idx, item["ten"], item["ma"], item["dvt"], item["bia"], item["ck"], item["sl"], item["dg"], tt_ck])
-
-                # --- 3. PHÉP TÍNH SHEET TỔNG HỢP HÀNG TRẢ (Mảng Âm, Lọc trùng Mã + CK, Bảo toàn dấu âm) ---
-                dic_hang_tra = {}
+                # --- 2. TH GIÁ BÌA TRẢ (ÂM - TÍNH NĂNG MỚI) ---
+                dic_gia_bia_tra = {}
                 for r in mảng_trả_âm:
-                    ma_hang = r[2]
-                    ten_hang = r[1]
-                    dvt_hang = r[3]
-                    gia_bia = r[4]
-                    ck_hang = r[5]
-                    sl_hang = r[6] # Mang dấu âm (-)
-                    dg_goc = r[7]  # Đơn giá thô gốc (dương)
-                    
-                    key_composite = f"{ma_hang}_{ck_hang}"
-                    if key_composite not in dic_hang_tra:
-                        dic_hang_tra[key_composite] = {
-                            "ten": ten_hang, "ma": ma_hang, "dvt": dvt_hang, 
-                            "bia": gia_bia, "ck": ck_hang, "sl": 0.0, "dg": dg_goc
-                        }
-                    dic_hang_tra[key_composite]["sl"] += sl_hang # Cộng dồn đại số giữ nguyên dấu âm
+                    ma = r[2]
+                    if ma not in dic_gia_bia_tra: dic_gia_bia_tra[ma] = {"ten": r[1], "dvt": r[3], "bia": r[4], "sl": 0.0}
+                    dic_gia_bia_tra[ma]["sl"] += r[6]
+                bảng_gia_bia_tra = [[i+1, v["ten"], k, v["dvt"], v["bia"], 0.0, v["sl"], v["bia"], v["sl"]*v["bia"]] for i, (k, v) in enumerate(dic_gia_bia_tra.items())]
 
-                bảng_hang_tra = []
-                for idx, (k, item) in enumerate(dic_hang_tra.items(), 1):
-                    tt_tra = item["sl"] * item["dg"] # Số lượng âm nhân đơn giá dương tự động ra thành tiền âm
-                    bảng_hang_tra.append([idx, item["ten"], item["ma"], item["dvt"], item["bia"], item["ck"], item["sl"], item["dg"], tt_tra])
+                # --- 3. TH CHIẾT KHẤU BÁN (DƯƠNG) ---
+                dic_ck_ban = {}
+                for r in mảng_bán_dương:
+                    key = f"{r[2]}_{r[5]}"
+                    if key not in dic_ck_ban: dic_ck_ban[key] = {"ten": r[1], "ma": r[2], "dvt": r[3], "bia": r[4], "ck": r[5], "sl": 0.0, "dg": r[7]}
+                    dic_ck_ban[key]["sl"] += r[6]
+                bảng_ck_ban = [[i+1, v["ten"], v["ma"], v["dvt"], v["bia"], v["ck"], v["sl"], v["dg"], v["sl"]*v["dg"]] for i, (k, v) in enumerate(dic_ck_ban.items())]
 
-                # --- KHỞI TẠO TIẾN TRÌNH ĐÓNG GÓI RA FILE EXCEL ĐA SHEET MÀU SẮC PAB21 ---
+                # --- 4. TH CHIẾT KHẤU TRẢ (ÂM) ---
+                dic_ck_tra = {}
+                for r in mảng_trả_âm:
+                    key = f"{r[2]}_{r[5]}"
+                    if key not in dic_ck_tra: dic_ck_tra[key] = {"ten": r[1], "ma": r[2], "dvt": r[3], "bia": r[4], "ck": r[5], "sl": 0.0, "dg": r[7]}
+                    dic_ck_tra[key]["sl"] += r[6]
+                bảng_ck_tra = [[i+1, v["ten"], v["ma"], v["dvt"], v["bia"], v["ck"], v["sl"], v["dg"], v["sl"]*v["dg"]] for i, (k, v) in enumerate(dic_ck_tra.items())]
+
+                # --- ĐÓNG GÓI EXCEL ĐA MÀU SẮC TAB ---
                 out_report = io.BytesIO()
-                columns_standard = ['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']
+                cols = ['STT', 'Tên sách', 'Mã số', 'ĐVT', 'Giá bìa', 'CK', 'Số lượng', 'Đơn giá', 'Thành tiền']
                 
                 with pd.ExcelWriter(out_report, engine='openpyxl') as writer:
-                    grand_summary_list = []
+                    summary_data = []
                     
-                    def ghi_sheet_he_thong(data_list, sheet_name, header_color, is_data_thô=False, has_vat=False):
-                        df_sheet = pd.DataFrame(data_list, columns=columns_standard)
-                        df_sheet.to_excel(writer, index=False, sheet_name=sheet_name)
-                        ws = writer.sheets[sheet_name]
-                        r_total = len(df_sheet) + 2
+                    def ghi_sheet(data, name, h_color, tab_color, has_vat=False):
+                        df = pd.DataFrame(data, columns=cols)
+                        df.to_excel(writer, index=False, sheet_name=name)
+                        ws = writer.sheets[name]
+                        ws.sheet_properties.tabColor = tab_color # TÔ MÀU TAB
                         
-                        sum_sl = df_sheet['Số lượng'].sum()
-                        sum_tt = df_sheet['Thành tiền'].sum()
+                        r_last = len(df) + 2
+                        s_sl, s_tt = df['Số lượng'].sum(), df['Thành tiền'].sum()
+                        ws.cell(row=r_last, column=6).value = "Tổng cộng:"
+                        ws.cell(row=r_last, column=7).value = s_sl
+                        ws.cell(row=r_last, column=9).value = s_tt
                         
-                        # Tạo dòng Tổng kết cuối bảng tính
-                        ws.cell(row=r_total, column=6).value = "Tổng cộng:"
-                        ws.cell(row=r_total, column=7).value = sum_sl
-                        ws.cell(row=r_total, column=9).value = sum_tt
-                        
-                        vat_val, sau_thue_val = 0.0, 0.0
+                        v_val, st_val = 0.0, 0.0
                         if has_vat:
-                            vat_val = sum_tt * 0.05
-                            sau_thue_val = sum_tt + vat_val
-                            ws.cell(row=r_total+1, column=8).value = "VAT 5%:"
-                            ws.cell(row=r_total+1, column=9).value = vat_val
-                            ws.cell(row=r_total+2, column=8).value = "Sau Thuế:"
-                            ws.cell(row=r_total+2, column=9).value = sau_thue_val
-                            
-                        trang_tri_sheet(ws, header_color, has_vat_summary=has_vat)
-                        return len(df_sheet), sum_sl, sum_tt, vat_val, sau_thue_val
+                            v_val = s_tt * 0.05
+                            st_val = s_tt + v_val
+                            ws.cell(row=r_last+1, column=8).value = "VAT 5%:"
+                            ws.cell(row=r_last+1, column=9).value = v_val
+                            ws.cell(row=r_last+2, column=8).value = "Sau Thuế:"
+                            ws.cell(row=r_last+2, column=9).value = st_val
+                        
+                        trang_tri_sheet(ws, h_color, has_vat_summary=has_vat)
+                        return len(df), s_sl, s_tt, v_val, st_val
 
-                    # A. GHI HAI SHEET BƯỚC ĐỆM TRUNG GIAN ĐỂ ĐỐI SOÁT (Màu Xám Ghi)
-                    l, q, a, _, _ = ghi_sheet_he_thong(mảng_bán_dương, "Du_Lieu_Ban_Duong", "595959", is_data_thô=True)
-                    grand_summary_list.append(["Du_Lieu_Ban_Duong", "Thô dương độc lập", l, q, a, 0.0, a, "Nguyên bản đầu vào dương"])
+                    # Ghi các sheet theo thứ tự và màu sắc Tab
+                    ghi_sheet(mảng_bán_dương, "Du_Lieu_Ban_Duong", "595959", "595959")
+                    ghi_sheet(mảng_trả_âm, "Du_Lieu_Tra_Am", "595959", "3B3838") # Màu 2 cho mảng Âm
                     
-                    l, q, a, _, _ = ghi_sheet_he_thong(mảng_trả_âm, "Du_Lieu_Tra_Am", "595959", is_data_thô=True)
-                    grand_summary_list.append(["Du_Lieu_Tra_Am", "Thô âm độc lập", l, q, a, 0.0, a, "Bảo toàn nguyên bản dấu âm"])
-
-                    # B. GHI SHEET TỔNG HỢP THEO GIÁ BÌA (Màu Xanh Dương Đậm)
-                    if bảng_gia_bia:
-                        l, q, a, _, _ = ghi_sheet_he_thong(bảng_gia_bia, "TH_Hang_Ban_Gia_Bia", "002060")
-                        grand_summary_list.append(["TH_Hang_Ban_Gia_Bia", "Gom mã (Giá bìa)", l, q, a, 0.0, a, "Chiết khấu bằng 0"])
-
-                    # C. GHI SHEET TỔNG HỢP THEO CHIẾT KHẤU (Màu Xanh Lá Cây)
-                    if bảng_chiet_khau:
-                        l_ck_goc, q_ck_goc, a_ck_goc, v_ck_goc, s_ck_goc = ghi_sheet_he_thong(bảng_chiet_khau, "TH_Hang_Ban_Chiet_Khau", "339933", has_vat=True)
-                        grand_summary_list.append(["TH_Hang_Ban_Chiet_Khau", "Gom mã + CK (Bán)", l_ck_goc, q_ck_goc, a_ck_goc, v_ck_goc, s_ck_goc, "Doanh thu xuất bán thực tế"])
-                    else:
-                        l_ck_goc, q_ck_goc, a_ck_goc, v_ck_goc, s_ck_goc = 0, 0.0, 0.0, 0.0, 0.0
-
-                    # D. GHI SHEET TỔNG HỢP HÀNG TRẢ BẢO TOÀN DẤU ÂM (Màu Đỏ Đô)
-                    if bảng_hang_tra:
-                        l_tra_goc, q_tra_goc, a_tra_goc, v_tra_goc, s_tra_goc = ghi_sheet_he_thong(bảng_hang_tra, "Tong_Hop_Hang_Tra", "C00000", has_vat=True)
-                        grand_summary_list.append(["Tong_Hop_Hang_Tra", "Gom mã + CK (Trả)", l_tra_goc, q_tra_goc, a_tra_goc, v_tra_goc, s_tra_goc, "Hàng trả giữ nguyên dấu âm"])
-                    else:
-                        l_tra_goc, q_tra_goc, a_tra_goc, v_tra_goc, s_tra_goc = 0, 0.0, 0.0, 0.0, 0.0
-
-                    # E. CHẶT KHÚC 1000 DÒNG TÁCH HÓA ĐƠN TỪ TẬP CHIẾT KHẤU BÁN DƯƠNG (Màu Xanh Ngọc)
-                    if bảng_chiet_khau:
-                        batch_size = 1000
-                        hd_count = 1
-                        for start_pos in range(0, len(bảng_chiet_khau), batch_size):
-                            batch_rows = bảng_chiet_khau[start_pos : start_pos + batch_size]
-                            
-                            # Đánh lại STT tịnh tiến từ 1 cho từng hóa đơn tách độc lập
-                            data_hd_reindexed = []
-                            for i_stt, r_data in enumerate(batch_rows, 1):
-                                r_copy = list(r_data)
-                                r_copy[0] = i_stt
-                                data_hd_reindexed.append(r_copy)
-                                
-                            hd_name = f"HD {hd_count}"
-                            l, q, a, vt, st_hd = ghi_sheet_he_thong(data_hd_reindexed, hd_name, "008080", has_vat=True)
-                            grand_summary_list.append([hd_name, "Hóa đơn tách 1000 dòng", l, q, a, vt, st_hd, f"Tách đoạn từ dòng {start_pos+1}"])
-                            hd_count += 1
-
-                    # F. XÂY DỰNG SHEET MA TRẬN TĨNH ĐỐI SOÁT TỐI CAO `Tong_Ket_Chung` (Màu Đen Kế Toán)
-                    columns_grand = ["Tên Sheet / Hạng mục", "Loại thuộc tính", "Số dòng", "Số lượng", "Trước Thuế", "VAT (5%)", "Sau Thuế", "Ghi chú"]
-                    df_grand_final = pd.DataFrame(grand_summary_list, columns=columns_grand)
-                    df_grand_final.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
+                    l, q, a, _, _ = ghi_sheet(bảng_gia_bia_ban, "TH_Hang_Ban_Gia_Bia", "002060", "002060")
+                    summary_data.append(["TH Hàng Bán Giá Bìa", "Dương", l, q, a, 0, a, "Giá Bìa Gốc"])
                     
-                    ws_grand = writer.sheets["Tong_Ket_Chung"]
-                    r_net = len(df_grand_final) + 2
-                    
-                    # CỘNG ĐẠI SỐ TRỰC TIẾP GIỮA BÁN (DƯƠNG) VÀ TRẢ (ÂM) - CHÍNH XÁC TUYỆT ĐỐI KHÔNG LỆCH DẤU
-                    net_qty = q_ck_goc + q_tra_goc
-                    net_amount = a_ck_goc + a_tra_goc
-                    net_vat = v_ck_goc + v_tra_goc
-                    net_after_tax = s_ck_goc + s_tra_goc
-                    
-                    ws_grand.cell(row=r_net, column=1).value = "DOANH THU THỰC TẾ ĐỐI SOÁT (BÁN + TRẢ)"
-                    ws_grand.cell(row=r_net, column=2).value = "Cộng đại số PAB21"
-                    ws_grand.cell(row=r_net, column=3).value = len(mảng_bán_dương) + len(mảng_trả_âm)
-                    ws_grand.cell(row=r_net, column=4).value = net_qty
-                    ws_grand.cell(row=r_net, column=5).value = net_amount
-                    ws_grand.cell(row=r_net, column=6).value = net_vat
-                    ws_grand.cell(row=r_net, column=7).value = net_after_tax
-                    
-                    trang_tri_sheet(ws_grand, "1F1F1F", total_row_type="grand")
-                    
-                    # Đẩy sheet Tong_Ket_Chung lên vị trí đầu tiên của Workbook
-                    wb_obj = writer.book
-                    sheets_order = [wb_obj.sheetnames[-1]] + wb_obj.sheetnames[:-1]
-                    wb_obj._sheets = [wb_obj._sheets[wb_obj.sheetnames.index(name)] for name in sheets_order]
+                    # SHEET MỚI: Hàng trả theo giá bìa
+                    l, q, a, _, _ = ghi_sheet(bảng_gia_bia_tra, "TH_Hang_Tra_Gia_Bia", "800000", "800000")
+                    summary_data.append(["TH Hàng Trả Giá Bìa", "Âm", l, q, a, 0, a, "Bảo toàn dấu âm"])
 
-                st.success("🎉 PHƯƠNG PHÁP PAB21 ĐÃ XỬ LÝ HOÀN TẤT VÀ CHÍNH XÁC TUYỆT ĐỐI!")
-                
-                # Hiển thị nhanh bảng đối soát lên giao diện Streamlit
-                t_total, t_ban_dem, t_tra_dem = st.tabs(["📋 Bảng Tổng Kết Đối Soát", "📥 Mảng Đệm Dương", "📤 Mảng Đệm Âm (Bảo Toàn Dấu)"])
-                with t_total:
-                    st.dataframe(df_grand_final, use_container_width=True)
-                    st.metric(label="Doanh Thu Thuần Thực Tế Cấu Trừ (Sau Thuế)", value=f"{net_after_tax:,.2f} đ")
-                with t_ban_dem:
-                    st.dataframe(pd.DataFrame(mảng_bán_dương, columns=columns_standard), use_container_width=True)
-                with t_tra_dem:
-                    st.dataframe(pd.DataFrame(mảng_trả_âm, columns=columns_standard), use_container_width=True)
+                    l_b, q_b, a_b, v_b, s_b = ghi_sheet(bảng_ck_ban, "TH_Hang_Ban_Chiet_Khau", "339933", "339933", has_vat=True)
+                    summary_data.append(["TH Hàng Bán Chiết Khấu", "Dương", l_b, q_b, a_b, v_b, s_b, "Bán thực tế"])
 
-                st.download_button(
-                    label="📥 TẢI FILE MASTER REPORT QUY CHUẨN PAB21",
-                    data=out_report.getvalue(),
-                    file_name=f"Master_Report_PAB21_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                    l_t, q_t, a_t, v_t, s_t = ghi_sheet(bảng_ck_tra, "Tong_Hop_Hang_Tra", "C00000", "C00000", has_vat=True)
+                    summary_data.append(["Tổng Hợp Hàng Trả", "Âm", l_t, q_t, a_t, v_t, s_t, "Trả thực tế (Âm)"])
+
+                    # Tách Hóa đơn (Cùng màu Tab Teal)
+                    if bảng_ck_ban:
+                        for i, start in enumerate(range(0, len(bảng_ck_ban), 1000), 1):
+                            batch = [list(r) for r in bảng_ck_ban[start:start+1000]]
+                            for idx, row in enumerate(batch, 1): row[0] = idx
+                            hd_name = f"HD {i}"
+                            l, q, a, v, s = ghi_sheet(batch, hd_name, "008080", "008080", has_vat=True)
+                            summary_data.append([hd_name, "Tách HĐ", l, q, a, v, s, f"Từ dòng {start+1}"])
+
+                    # Sheet Tổng Kết (Đẩy lên đầu)
+                    df_sum = pd.DataFrame(summary_data, columns=["Tên Sheet / Hạng mục", "Loại", "Số dòng", "Số lượng", "Trước Thuế", "VAT (5%)", "Sau Thuế", "Ghi chú"])
+                    df_sum.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
+                    ws_sum = writer.sheets["Tong_Ket_Chung"]
+                    ws_sum.sheet_properties.tabColor = "1F1F1F"
+                    
+                    # Doanh thu thực tế (Bán + Trả âm)
+                    r_net = len(df_sum) + 2
+                    ws_sum.cell(row=r_net, column=1).value = "DOANH THU THỰC TẾ (BÁN + TRẢ)"
+                    ws_sum.cell(row=r_net, column=4).value = q_b + q_t
+                    ws_sum.cell(row=r_net, column=5).value = a_b + a_t
+                    ws_sum.cell(row=r_net, column=6).value = v_b + v_t
+                    ws_sum.cell(row=r_net, column=7).value = s_b + s_t
+                    trang_tri_sheet(ws_sum, "1F1F1F", total_row_type="grand")
+                    
+                    wb = writer.book
+                    wb._sheets = [wb._sheets[wb.sheetnames.index(n)] for n in (["Tong_Ket_Chung"] + [sn for sn in wb.sheetnames if sn != "Tong_Ket_Chung"])]
+
+                st.success("🎉 NÂNG CẤP TÍNH NĂNG THÀNH CÔNG!")
+                st.download_button(label="📥 TẢI MASTER REPORT NÂNG CẤP (PAB21 - CODE1)", data=out_report.getvalue(), file_name=f"Master_PAB21_Upgrade_{datetime.now().strftime('%m%d_%H%M')}.xlsx")
             except Exception as e:
-                st.error(f"Lỗi nghiêm trọng phát sinh tại Giai đoạn 2 (PAB21): {str(e)}")
+                st.error(f"Lỗi: {str(e)}")
