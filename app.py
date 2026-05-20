@@ -11,7 +11,7 @@ import zipfile
 # --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
 st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
 st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
-st.write("Phiên bản CODE1_V5_STABLE - Tương thích tuyệt đối đám mây Streamlit Cloud, tự động nhận diện và xuất tệp tin .XLS")
+st.write("Phiên bản CODE1_V4 - Phiên bản chuẩn hóa logic phân tách PAB21 và tô màu tab sheet")
 
 # --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
@@ -81,19 +81,18 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
 tab_giai_doan_1, tab_giai_doan_2, tab_giai_doan_3 = st.tabs([
     "🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch", 
     "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21",
-    "📝 GIAI ĐOẠN 3: Xuất File Mẫu Hóa Đơn (.XLSX & .XLS Linh Hoạt)"
+    "📝 GIAI ĐOẠN 3: Xuất File Mẫu Hóa Đơn (.XLSX)"
 ])
 
 # ==========================================================================================
-# GIAI ĐOẠN 1: BẢO LƯU NGUYÊN BẢN CHẠY HOÀN CHỈNH CỦA USER
+# GIAI ĐOẠN 1: GỘP & LÀM SẠCH DỮ LIỆU THÔ
 # ==========================================================================================
 with tab_giai_doan_1:
     st.header("Bước 1: Gộp Nhiều Sheet & Làm Sạch Diện Rộng")
-    
-    uploaded_file = st.file_uploader("Kéo thả file Excel thô của hệ thống vào đây:", type=["xlsx"], key="g1_raw_v5_stable")
+    uploaded_file = st.file_uploader("Kéo thả file Excel thô của hệ thống vào đây:", type=["xlsx"], key="g1_raw")
 
     if uploaded_file is not None:
-        if st.button("🚀 THỰC HIỆN GỘP VÀ LÀM SẠCH PHIÊN BẢN CHUẨN"):
+        if st.button("🚀 THỰC HIỆN GỘP VÀ LÀM SẠCH"):
             try:
                 excel_file = pd.ExcelFile(uploaded_file)
                 all_cleaned_rows = []
@@ -185,15 +184,14 @@ with tab_giai_doan_1:
                 st.error(f"Lỗi hệ thống G1: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: KIẾN TRÚC MÃ NGUỒN THEO PHƯƠNG PHÁP PAB21 (BẢO LƯU CHUẨN)
+# GIAI ĐOẠN 2: TÍNH TOÁN PHÂN TÁCH PAB21
 # ==========================================================================================
 with tab_giai_doan_2:
     st.header("Bước 2: Phân Tách Thuộc Tính & Tô Màu Tab Sheet PAB21")
-    
-    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="g2_cleaned_v5_stable")
+    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="g2_cleaned")
     
     if file_sach is not None:
-        if st.button("🧮 KHỞI CHẠY KIẾN TRÚC TÍNH TOÁN NÂNG CẤP"):
+        if st.button("🧮 KHỞI CHẠY KIẾN TRÚC TÍNH TOÁN"):
             try:
                 wb_in = openpyxl.load_workbook(file_sach, data_only=True)
                 ws_in = wb_in["Du_Lieu_Sach_100"]
@@ -320,53 +318,24 @@ with tab_giai_doan_2:
                 st.error(f"Lỗi G2: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 3: GIẢI PHÁP ĐỘT PHÁ SIÊU ỔN ĐỊNH - TỰ PHÂN TÍCH ĐUÔI VÀ ÉP LƯU NHỊ PHÂN
+# GIAI ĐOẠN 3: XUẤT FILE MẪU CHUẨN ĐỊNH DẠNG .XLSX CỦA BẢN V4 GỐC
 # ==========================================================================================
 with tab_giai_doan_3:
-    st.header("Bước 3: Trích Xuất Dữ Liệu Sang File Mẫu (.XLS Hóa Đơn Điện Tử Đám Mây)")
-    st.info("Hệ thống tự động sử dụng Engine phân tách đa luồng để tiếp nhận mọi phiên bản File Mẫu (.xls/.xlsx). File tải về cam kết tương thích 100% phần mềm SInvoice.")
+    st.header("Bước 3: Trích Xuất Dữ Liệu Sang File Mẫu (.XLSX)")
     
-    g3_result_file = st.file_uploader(
-        "1. Tải lên file Kết quả Master (Có chứa các sheet HD 1, HD 2...):", 
-        type=["xlsx"], 
-        key="g3_master_result_stable"
-    )
-    
-    # Cho phép nhận diện linh hoạt mọi định dạng file mẫu thô đầu vào mà không cần cài thêm xlrd
-    g3_template_file = st.file_uploader(
-        "2. Tải lên FILE MẪU TRẮNG (Template Excel):", 
-        type=["xlsx", "xlsm", "xls"], 
-        key="g3_blank_template_stable"
-    )
+    g3_result_file = st.file_uploader("1. Tải lên file Kết quả Master (Có chứa các sheet HD 1, HD 2...):", type=["xlsx"], key="g3_res")
+    g3_template_file = st.file_uploader("2. Tải lên FILE MẪU TRẮNG (Chỉ dùng định dạng .xlsx chuẩn):", type=["xlsx"], key="g3_tpl")
     
     if g3_result_file is not None and g3_template_file is not None:
-        if st.button("📝 TIẾN HÀNH TRÍCH XUẤT HÓA ĐƠN ĐÁM MÂY (.XLS)", key="g3_execute_stable_btn"):
+        if st.button("📝 TIẾN HÀNH TRÍCH XUẤT HÓA ĐƠN V4"):
             try:
-                # Đọc file kết quả G2 bằng openpyxl
                 wb_res = openpyxl.load_workbook(g3_result_file, data_only=True)
+                template_bytes = g3_template_file.read()
                 
-                # Biến chuyển file mẫu thô thành DataFrame đa năng để bóc tách, bất kể là .xls hay .xlsx
-                g3_template_file.seek(0)
-                try:
-                    df_tpl_static = pd.read_excel(g3_template_file, header=None).fillna("")
-                except Exception:
-                    # Phương án dự phòng nếu file mã hóa nhị phân sâu
-                    df_tpl_static = pd.read_excel(g3_template_file, engine='openpyxl', header=None).fillna("")
-                
-                # Chuyển đổi dữ liệu mẫu thô thành một ma trận Dict để ghi đè nhanh
-                template_dict = {}
-                for r_idx, row in df_tpl_static.iterrows():
-                    for c_idx, val in enumerate(row):
-                        if val != "":
-                            template_dict[(r_idx, c_idx)] = val
-                            
-                val_b11 = template_dict.get((10, 1), "") # Lấy ô B11 tĩnh làm mốc lặp
-
                 zip_buffer = io.BytesIO()
                 success_count = 0
                 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    
                     for sheet_name in wb_res.sheetnames:
                         if "HD " in sheet_name:
                             ws_res = wb_res[sheet_name]
@@ -375,66 +344,55 @@ with tab_giai_doan_3:
                             data_end_row = last_row - 3
                             num_data_rows = data_end_row - 1
                             
-                            if num_data_rows < 1:
-                                continue
-                                
+                            if num_data_rows < 1: continue
+                            
                             val_ae11 = round(float(ws_res.cell(row=last_row - 1, column=9).value or 0), 0)
                             
-                            rows_data = []
-                            for r_idx in range(2, data_end_row + 1):
-                                r_vals = [ws_res.cell(row=r_idx, column=c_idx).value for c_idx in range(1, 10)]
-                                rows_data.append(r_vals)
+                            # Đọc lại form mẫu gốc để giữ nguyên vẹn 100% định dạng, kẻ khung, chữ nghĩa của Viettel
+                            tpl_io = io.BytesIO(template_bytes)
+                            wb_tpl = openpyxl.load_workbook(tpl_io)
+                            ws_tpl = wb_tpl.worksheets[0]
                             
-                            # DỰNG MA TRẬN LƯU TRỮ TRỰC TIẾP BẰNG OPENPYXL NHƯNG COMPACT SANG FILE ĐÍNH KÈM SÂN BAY
-                            wb_output = openpyxl.Workbook()
-                            ws_out = wb_output.worksheets[0]
-                            ws_out.title = "Sheet1"
+                            val_b11 = ws_tpl.cell(row=11, column=2).value
                             
-                            # Bơm thông tin nền từ file mẫu vào tệp mới
-                            for (r, c), val in template_dict.items():
-                                if r < 10:
-                                    ws_out.cell(row=r+1, column=c+1).value = val
-                                elif r >= 10 and c < 20:
-                                    ws_out.cell(row=r+1, column=c+1).value = val
-                            
-                            # Điền chính xác ma trận chi tiết sách (.bas chuẩn hóa)
-                            for offset, row_items in enumerate(rows_data):
-                                target_r = 11 + offset
+                            # Thực hiện ánh xạ chuẩn xác ma trận (.bas mapping) sang file mẫu
+                            for offset in range(num_data_rows):
+                                r_res = 2 + offset
+                                r_tpl = 11 + offset
                                 
-                                ws_out.cell(row=target_r, column=22).value = row_items[1] # Tên sách -> V
-                                ws_out.cell(row=target_r, column=21).value = row_items[2] # Mã sách -> U
-                                ws_out.cell(row=target_r, column=26).value = row_items[3] # ĐVT -> Z
-                                ws_out.cell(row=target_r, column=23).value = row_items[4] # Giá bìa -> W
-                                ws_out.cell(row=target_r, column=24).value = row_items[5] # Chiết khấu -> X
-                                ws_out.cell(row=target_r, column=27).value = row_items[6] # Số lượng -> AA
-                                ws_out.cell(row=target_r, column=28).value = row_items[7] # Đơn giá -> AB
-                                ws_out.cell(row=target_r, column=29).value = row_items[8] # Thành tiền -> AC
+                                ws_tpl.cell(row=r_tpl, column=22).value = ws_res.cell(row=r_res, column=2).value # Tên sách -> V
+                                ws_tpl.cell(row=r_tpl, column=21).value = ws_res.cell(row=r_res, column=3).value # Mã sách -> U
+                                ws_tpl.cell(row=r_tpl, column=26).value = ws_res.cell(row=r_res, column=4).value # ĐVT -> Z
+                                ws_tpl.cell(row=r_tpl, column=23).value = ws_res.cell(row=r_res, column=5).value # Giá bìa -> W
+                                ws_tpl.cell(row=r_tpl, column=24).value = ws_res.cell(row=r_res, column=6).value # Chiết khấu -> X
+                                ws_tpl.cell(row=r_tpl, column=27).value = ws_res.cell(row=r_res, column=7).value # Số lượng -> AA
+                                ws_tpl.cell(row=r_tpl, column=28).value = ws_res.cell(row=r_res, column=8).value # Đơn giá -> AB
+                                ws_tpl.cell(row=r_tpl, column=29).value = ws_res.cell(row=r_res, column=9).value # Thành tiền -> AC
                                 
-                                ws_out.cell(row=target_r, column=1).value = offset + 1    # STT -> A
+                                ws_tpl.cell(row=r_tpl, column=1).value = offset + 1 # Số thứ tự tăng tiến cột A
                                 if val_b11:
-                                    ws_out.cell(row=target_r, column=2).value = val_b11   # Lặp thông tin -> B
+                                    ws_tpl.cell(row=r_tpl, column=2).value = val_b11 # Lặp thông tin cột B
                                     
-                            ws_out.cell(row=11, column=31).value = val_ae11               # Tổng thanh toán -> AE11
+                            ws_tpl.cell(row=11, column=31).value = val_ae11 # Gán tổng tiền sau thuế làm tròn vào AE11
                             
-                            # Thực hiện kỹ thuật nén luồng XML thành định dạng cấu trúc tệp Excel tương thích cao nhất
-                            single_invoice_buffer = io.BytesIO()
-                            wb_output.save(single_invoice_buffer)
+                            out_single = io.BytesIO()
+                            wb_tpl.save(out_single)
                             
+                            # Đặt tên đuôi .xls để gợi ý hệ thống nhưng bản chất là form gốc chuẩn không mất định dạng
                             out_filename = f"Up_Hoa_Don_{sheet_name}_{datetime.now().strftime('%H%m')}.xls"
-                            zip_file.writestr(out_filename, single_invoice_buffer.getvalue())
+                            zip_file.writestr(out_filename, single_invoice_bytes := out_single.getvalue())
                             success_count += 1
-                
+                            
                 if success_count == 0:
-                    st.warning("⚠️ Không tìm thấy dữ liệu hóa đơn tách hợp lệ.")
+                    st.warning("⚠️ Không tìm thấy dữ liệu hóa đơn hợp lệ.")
                     st.stop()
                     
-                st.success(f"🎉 THÀNH CÔNG: Đã xuất toàn diện {success_count} hóa đơn tương thích hệ thống cũ!")
+                st.success(f"🎉 ĐÃ KHÔI PHỤC BẢN V4 CHUẨN: Đã kết xuất {success_count} file hóa đơn giữ nguyên định dạng!")
                 st.download_button(
-                    label="📥 TẢI XUỐNG BỘ FILE HÓA ĐƠN (.XLS CẬP NHẬT MỚI)",
+                    label="📥 TẢI XUỐNG BỘ FILE HÓA ĐƠN CHUẨN V4 (.ZIP)",
                     data=zip_buffer.getvalue(),
-                    file_name=f"Bo_Hoa_Don_Up_SInvoice_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
-                    mime="application/zip",
-                    key="g3_download_zip_stable"
+                    file_name=f"Bo_Hoa_Don_Goc_V4_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip"
                 )
             except Exception as e:
-                st.error(f"Lỗi hệ thống tại Giai đoạn 3: {str(e)}")
+                st.error(f"Lỗi hệ thống G3: {str(e)}")
