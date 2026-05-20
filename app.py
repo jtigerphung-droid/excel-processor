@@ -8,12 +8,22 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import zipfile
 
-# --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
-st.set_page_config(page_title="Hệ thống xử lý dữ liệu 3 Giai Đoạn", layout="wide")
-st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU")
-st.write("Phiên bản CODE1_V4 - Phiên bản chuẩn hóa logic phân tách PAB21 và tô màu tab sheet")
+# --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ĐẬM CHẤT DASHBOARD ---
+st.set_page_config(
+    page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
+# Phong cách hóa tiêu đề ứng dụng trực quan hơn
+st.markdown("""
+    <div style="background-color: #0f172a; padding: 20px; border-radius: 10px; margin-bottom: 25px; border-left: 5px solid #0284c7;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-family: 'Arial';">📊 HỆ THỐNG QUẢN TRỊ DỮ LIỆU PHÁT HÀNH SÁCH</h1>
+        <p style="color: #94a3b8; margin: 5px 0 0 0; font-size: 14px;">Phiên bản V4 Pro Interface — Tối ưu hóa trải nghiệm Dashboard Kế toán & Phân tách Doanh thu PAB21</p>
+    </div>
+""", unsafe_allow_html=True)
+
+# --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN (GIỮ NGUYÊN 100% CỐT LÕI) ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
     font_tieude = Font(name="Arial", size=10, bold=True, color="FFFFFF")
     fill_tieude = PatternFill(start_color=tieude_color, end_color=tieude_color, fill_type="solid")
@@ -77,22 +87,25 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
         worksheet.column_dimensions[col_letter].width = max(max_len + 3, 12)
 
 
-# --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB ---
+# --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB (THIẾT KẾ LẠI ICON TRỰC QUAN) ---
 tab_giai_doan_1, tab_giai_doan_2, tab_giai_doan_3 = st.tabs([
-    "🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch", 
+    "📥 GIAI ĐOẠN 1: Gộp & Làm Sạch Dữ Liệu", 
     "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21",
-    "📝 GIAI ĐOẠN 3: Xuất File Mẫu Hóa Đơn (.XLSX)"
+    "📝 GIAI ĐOẠN 3: Đóng Gói File Hóa Đơn Mẫu"
 ])
 
 # ==========================================================================================
 # GIAI ĐOẠN 1: GỘP & LÀM SẠCH DỮ LIỆU THÔ
 # ==========================================================================================
 with tab_giai_doan_1:
-    st.header("Bước 1: Gộp Nhiều Sheet & Làm Sạch Diện Rộng")
-    uploaded_file = st.file_uploader("Kéo thả file Excel thô của hệ thống vào đây:", type=["xlsx"], key="g1_raw")
+    st.markdown("### 🗂️ Quy trình xử lý cấu trúc dữ liệu thô diện rộng")
+    st.info("💡 Hệ thống sẽ tự động quét qua toàn bộ các Sheet, bóc tách cấu trúc, bỏ dòng thừa/dòng ký duyệt để gom về một bảng Master duy nhất.")
+    
+    uploaded_file = st.file_uploader("Chọn file Excel thô xuất từ hệ thống nội bộ (.xlsx):", type=["xlsx"], key="g1_raw")
 
     if uploaded_file is not None:
-        if st.button("🚀 THỰC HIỆN GỘP VÀ LÀM SẠCH"):
+        st.markdown("---")
+        if st.button("🚀 KHỞI CHẠY LÀM SẠCH VÀ CHUẨN HÓA DỮ LIỆU", use_container_width=True):
             try:
                 excel_file = pd.ExcelFile(uploaded_file)
                 all_cleaned_rows = []
@@ -170,28 +183,40 @@ with tab_giai_doan_1:
                 with pd.ExcelWriter(out_sach, engine='openpyxl') as writer:
                     df_master.to_excel(writer, index=False, sheet_name="Du_Lieu_Sach_100")
                     trang_tri_sheet(writer.sheets["Du_Lieu_Sach_100"], "003366")
-                    
-                st.success("🎉 GIAI ĐOẠN 1 HOÀN THÀNH!")
+                
+                # THIẾT KẾ CARD THÔNG SỐ TỔNG QUAN GIỐNG MẪU DASHBOARD
+                st.markdown("#### ✨ KẾT QUẢ ĐÃ TRÍCH XUẤT THÀNH CÔNG")
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.metric(label="Tổng số hạng mục sách tìm thấy", value=f"{len(df_master)} dòng")
+                with c2:
+                    st.metric(label="Tổng sản lượng sách gộp", value=f"{int(df_master['Số lượng'].sum()):,} cuốn")
+                
                 st.dataframe(df_master, use_container_width=True)
                 
+                st.markdown('<div style="margin-top:15px;"></div>', unsafe_allow_html=True)
                 st.download_button(
-                    label="📥 TẢI FILE DỮ LIỆU SẠCH",
+                    label="📥 TẢI XUỐNG TỆP TIN DỮ LIỆU SẠCH (.XLSX)",
                     data=out_sach.getvalue(),
                     file_name=f"DuLieu_Gop_Va_LamSach_Chuan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
                 )
             except Exception as e:
                 st.error(f"Lỗi hệ thống G1: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: TÍNH TOÁN PHÂN TÁCH PAB21
+# GIAI ĐOẠN 2: TÍNH TOÁN PHÂN TÁCH PAB21 (GIAO DIỆN HIỆN ĐẠI HÓA)
 # ==========================================================================================
 with tab_giai_doan_2:
-    st.header("Bước 2: Phân Tách Thuộc Tính & Tô Màu Tab Sheet PAB21")
-    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN:", type=["xlsx"], key="g2_cleaned")
+    st.markdown("### 🏛️ Phân tách ma trận thuộc tính doanh thu PAB21 & Tô màu định dạng")
+    st.info("💡 Hệ thống tách riêng biệt luồng hàng bán (Dương) và hàng trả (Âm), tự động gom nhóm theo chiết khấu riêng biệt và chia nhỏ thành các gói HĐ giới hạn tối đa 1000 dòng.")
+    
+    file_sach = st.file_uploader("Tải lên file Excel ĐÃ LÀM SẠCH CHUẨN từ Giai đoạn 1:", type=["xlsx"], key="g2_cleaned")
     
     if file_sach is not None:
-        if st.button("🧮 KHỞI CHẠY KIẾN TRÚC TÍNH TOÁN"):
+        st.markdown("---")
+        if st.button("🧮 KÍCH HOẠT THUẬT TOÁN TÍNH TOÁN & THIẾT LẬP REPORT", use_container_width=True):
             try:
                 wb_in = openpyxl.load_workbook(file_sach, data_only=True)
                 ws_in = wb_in["Du_Lieu_Sach_100"]
@@ -288,6 +313,7 @@ with tab_giai_doan_2:
                     l_t, q_t, a_t, v_t, s_t = ghi_sheet(bảng_ck_tra, "Tong_Hop_Hang_Tra", "C00000", "C00000", has_vat=True)
                     summary_data.append(["Tổng Hợp Hàng Trả", "Âm", l_t, q_t, a_t, v_t, s_t, "Trả thực tế (Âm)"])
 
+                    num_invoices = 0
                     if bảng_ck_ban:
                         for i, start in enumerate(range(0, len(bảng_ck_ban), 1000), 1):
                             batch = [list(r) for r in bảng_ck_ban[start:start+1000]]
@@ -295,39 +321,69 @@ with tab_giai_doan_2:
                             hd_name = f"HD {i}"
                             l, q, a, v, s = ghi_sheet(batch, hd_name, "008080", "008080", has_vat=True)
                             summary_data.append([hd_name, "Tách HĐ", l, q, a, v, s, f"Từ dòng {start+1}"])
+                            num_invoices += 1
 
                     df_sum = pd.DataFrame(summary_data, columns=["Tên Sheet / Hạng mục", "Loại", "Số dòng", "Số lượng", "Trước Thuế", "VAT (5%)", "Sau Thuế", "Ghi chú"])
                     df_sum.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
                     ws_sum = writer.sheets["Tong_Ket_Chung"]
                     ws_sum.sheet_properties.tabColor = "1F1F1F"
                     
-                    r_net = len(df_sum) + 2
-                    ws_sum.cell(row=r_net, column=1).value = "DOANH THU THỰC TẾ (BÁN + TRẢ)"
-                    ws_sum.cell(row=r_net, column=4).value = q_b + q_t
-                    ws_sum.cell(row=r_net, column=5).value = a_b + a_t
-                    ws_sum.cell(row=r_net, column=6).value = v_b + v_t
-                    ws_sum.cell(row=r_net, column=7).value = s_b + s_t
+                    net_q = q_b + q_t
+                    net_a = a_b + a_t
+                    net_v = v_b + v_t
+                    net_s = s_b + s_t
+                    
+                    ws_sum.cell(row=len(df_sum) + 2, column=1).value = "DOANH THU THỰC TẾ (BÁN + TRẢ)"
+                    ws_sum.cell(row=len(df_sum) + 2, column=4).value = net_q
+                    ws_sum.cell(row=len(df_sum) + 2, column=5).value = net_a
+                    ws_sum.cell(row=len(df_sum) + 2, column=6).value = net_v
+                    ws_sum.cell(row=len(df_sum) + 2, column=7).value = net_s
                     trang_tri_sheet(ws_sum, "1F1F1F", total_row_type="grand")
                     
                     wb = writer.book
                     wb._sheets = [wb._sheets[wb.sheetnames.index(n)] for n in (["Tong_Ket_Chung"] + [sn for sn in wb.sheetnames if sn != "Tong_Ket_Chung"])]
 
-                st.success("🎉 GIAI ĐOẠN 2 HOÀN TẤT CHÍNH XÁC!")
-                st.download_button(label="📥 TẢI FILE MASTER REPORT G2", data=out_report.getvalue(), file_name=f"Master_PAB21_{datetime.now().strftime('%m%d_%H%M')}.xlsx")
+                # GIAO DIỆN KHỐI KPI TỔNG QUAN HIỆN ĐẠI (GIỐNG HÌNH CHỤP MẪU)
+                st.markdown("#### 📊 TỔNG HỢP BIẾN ĐỘNG DOANH THU HỆ THỐNG")
+                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+                with kpi1:
+                    st.metric(label="Tổng Sản Lượng Thực Tế", value=f"{int(net_q):,} cp")
+                with kpi2:
+                    st.metric(label="Doanh Thu Trước Thuế (Net)", value=f"{net_a:,.0f} đ")
+                with kpi3:
+                    st.metric(label="Tổng Thuế GTGT VAT (5%)", value=f"{net_v:,.0f} đ")
+                with kpi4:
+                    st.metric(label="Số lượng HĐ tách (Max 1k dòng)", value=f"{num_invoices} file", delta="Sẵn sàng xuất")
+                
+                st.success("🎉 THUẬT TOÁN ĐÃ PHÂN TÁCH XONG MA TRẬN SHEET TAB!")
+                st.dataframe(df_sum, use_container_width=True)
+                
+                st.markdown('<div style="margin-top:15px;"></div>', unsafe_allow_html=True)
+                st.download_button(
+                    label="📥 TẢI FILE PHÂN TÍCH TỔNG HỢP MASTER REPORT G2 (.XLSX)", 
+                    data=out_report.getvalue(), 
+                    file_name=f"Master_PAB21_{datetime.now().strftime('%m%d_%H%M')}.xlsx",
+                    use_container_width=True
+                )
             except Exception as e:
                 st.error(f"Lỗi G2: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 3: XUẤT FILE MẪU CHUẨN ĐỊNH DẠNG .XLSX CỦA BẢN V4 GỐC
+# GIAI ĐOẠN 3: XUẤT FILE MẪU CHUẨN ĐỊNH DẠNG V4 GỐC
 # ==========================================================================================
 with tab_giai_doan_3:
-    st.header("Bước 3: Trích Xuất Dữ Liệu Sang File Mẫu (.XLSX)")
+    st.markdown("### 📝 Kết xuất ma trận sang biểu mẫu Hóa đơn điện tử Viettel")
+    st.info("💡 Hệ thống đọc cấu trúc tệp Master G2 và tự động ánh xạ dữ liệu chuẩn xác lên Form mẫu .xlsx của nhà cung cấp Viettel, cam kết giữ nguyên 100% định dạng khung viền gốc.")
     
-    g3_result_file = st.file_uploader("1. Tải lên file Kết quả Master (Có chứa các sheet HD 1, HD 2...):", type=["xlsx"], key="g3_res")
-    g3_template_file = st.file_uploader("2. Tải lên FILE MẪU TRẮNG (Chỉ dùng định dạng .xlsx chuẩn):", type=["xlsx"], key="g3_tpl")
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        g3_result_file = st.file_uploader("1. Tải file Kết quả Master Report G2:", type=["xlsx"], key="g3_res")
+    with col_f2:
+        g3_template_file = st.file_uploader("2. Tải FILE MẪU TRẮNG (.xlsx giữ form):", type=["xlsx"], key="g3_tpl")
     
     if g3_result_file is not None and g3_template_file is not None:
-        if st.button("📝 TIẾN HÀNH TRÍCH XUẤT HÓA ĐƠN V4"):
+        st.markdown("---")
+        if st.button("📝 TIẾN HÀNH ĐÓNG GÓI HÓA ĐƠN HÀNG LOẠT", use_container_width=True):
             try:
                 wb_res = openpyxl.load_workbook(g3_result_file, data_only=True)
                 template_bytes = g3_template_file.read()
@@ -348,14 +404,12 @@ with tab_giai_doan_3:
                             
                             val_ae11 = round(float(ws_res.cell(row=last_row - 1, column=9).value or 0), 0)
                             
-                            # Đọc lại form mẫu gốc để giữ nguyên vẹn 100% định dạng, kẻ khung, chữ nghĩa của Viettel
                             tpl_io = io.BytesIO(template_bytes)
                             wb_tpl = openpyxl.load_workbook(tpl_io)
                             ws_tpl = wb_tpl.worksheets[0]
                             
                             val_b11 = ws_tpl.cell(row=11, column=2).value
                             
-                            # Thực hiện ánh xạ chuẩn xác ma trận (.bas mapping) sang file mẫu
                             for offset in range(num_data_rows):
                                 r_res = 2 + offset
                                 r_tpl = 11 + offset
@@ -369,30 +423,33 @@ with tab_giai_doan_3:
                                 ws_tpl.cell(row=r_tpl, column=28).value = ws_res.cell(row=r_res, column=8).value # Đơn giá -> AB
                                 ws_tpl.cell(row=r_tpl, column=29).value = ws_res.cell(row=r_res, column=9).value # Thành tiền -> AC
                                 
-                                ws_tpl.cell(row=r_tpl, column=1).value = offset + 1 # Số thứ tự tăng tiến cột A
+                                ws_tpl.cell(row=r_tpl, column=1).value = offset + 1
                                 if val_b11:
-                                    ws_tpl.cell(row=r_tpl, column=2).value = val_b11 # Lặp thông tin cột B
+                                    ws_tpl.cell(row=r_tpl, column=2).value = val_b11
                                     
-                            ws_tpl.cell(row=11, column=31).value = val_ae11 # Gán tổng tiền sau thuế làm tròn vào AE11
+                            ws_tpl.cell(row=11, column=31).value = val_ae11
                             
                             out_single = io.BytesIO()
                             wb_tpl.save(out_single)
                             
-                            # Đặt tên đuôi .xls để gợi ý hệ thống nhưng bản chất là form gốc chuẩn không mất định dạng
                             out_filename = f"Up_Hoa_Don_{sheet_name}_{datetime.now().strftime('%H%m')}.xls"
-                            zip_file.writestr(out_filename, single_invoice_bytes := out_single.getvalue())
+                            zip_file.writestr(out_filename, out_single.getvalue())
                             success_count += 1
                             
                 if success_count == 0:
-                    st.warning("⚠️ Không tìm thấy dữ liệu hóa đơn hợp lệ.")
+                    st.warning("⚠️ Hệ thống không phát hiện dữ liệu hóa đơn dạng tách hợp lệ.")
                     st.stop()
                     
-                st.success(f"🎉 ĐÃ KHÔI PHỤC BẢN V4 CHUẨN: Đã kết xuất {success_count} file hóa đơn giữ nguyên định dạng!")
+                st.balloons() # Hiệu ứng bóng bay chúc mừng chuyên nghiệp khi hoàn thành tác vụ nặng
+                st.success(f"🔥 XUẤT HOÀN TẤT: Đã tạo thành công bộ {success_count} hóa đơn điện tử chuẩn mẫu Viettel!")
+                
+                st.markdown('<div style="margin-top:15px;"></div>', unsafe_allow_html=True)
                 st.download_button(
-                    label="📥 TẢI XUỐNG BỘ FILE HÓA ĐƠN CHUẨN V4 (.ZIP)",
+                    label="📥 TẢI XUỐNG TOÀN BỘ BỘ FILE HÓA ĐƠN (.ZIP)",
                     data=zip_buffer.getvalue(),
                     file_name=f"Bo_Hoa_Don_Goc_V4_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
-                    mime="application/zip"
+                    mime="application/zip",
+                    use_container_width=True
                 )
             except Exception as e:
                 st.error(f"Lỗi hệ thống G3: {str(e)}")
