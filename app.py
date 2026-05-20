@@ -10,7 +10,7 @@ import zipfile
 
 # --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ĐẬM CHẤT DASHBOARD ---
 st.set_page_config(
-    page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", 
+    page_title="Hệ thống xử lý dữ liệu 3 Giai Đoạn", 
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -18,7 +18,7 @@ st.set_page_config(
 # Phong cách hóa tiêu đề ứng dụng trực quan hơn
 st.markdown("""
     <div style="background-color: #0f172a; padding: 20px; border-radius: 10px; margin-bottom: 25px; border-left: 5px solid #0284c7;">
-        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-family: 'Arial';">📊 HỆ THỐNG QUẢN TRỊ DỮ LIỆU PHÁT HÀNH SÁCH</h1>
+        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-family: 'Arial';">📊 HỆ THỐNG XỬ LÝ DỮ LIỆU</h1>
         <p style="color: #94a3b8; margin: 5px 0 0 0; font-size: 14px;">Phiên bản V4 Pro Interface — Tối ưu hóa trải nghiệm Dashboard Kế toán & Phân tách Doanh thu PAB21</p>
     </div>
 """, unsafe_allow_html=True)
