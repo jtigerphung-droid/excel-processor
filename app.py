@@ -6,11 +6,12 @@ from datetime import datetime
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import zipfile  # Kế thừa phục vụ đóng gói nhiều file hóa đơn ở Bước 3
 
 # --- CẤU HÌNH GIAO DIỆN HỆ THỐNG ---
 st.set_page_config(page_title="Hệ thống Phát Hành Sách 2 Giai Đoạn", layout="wide")
 st.title("📊 HỆ THỐNG XỬ LÝ DỮ LIỆU PHÁT HÀNH SÁCH")
-st.write("Phiên bản CODE1 Nâng Cấp - Bổ sung TH Hàng Trả Giá Bìa & Tô màu Tab Sheet.")
+st.write("Phiên bản CODE1_V3 - Hoàn thiện trọn gói 3 Giai đoạn (Tích hợp xuất File Mẫu Hóa Đơn).")
 
 # --- HÀM TRANG TRÍ EXCEL THEO QUY CHUẨN KẾ TOÁN ---
 def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_type="standard"):
@@ -77,7 +78,11 @@ def trang_tri_sheet(worksheet, tieude_color, has_vat_summary=False, total_row_ty
 
 
 # --- ĐIỀU HƯỚNG TÍNH NĂNG QUA TAB ---
-tab_giai_doan_1, tab_giai_doan_2 = st.tabs(["🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch (Bảo Lưu)", "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21"])
+tab_giai_doan_1, tab_giai_doan_2, tab_giai_doan_3 = st.tabs([
+    "🔄 GIAI ĐOẠN 1: Gộp & Làm Sạch", 
+    "🧮 GIAI ĐOẠN 2: Tính Toán Phân Tách PAB21",
+    "📝 GIAI ĐOẠN 3: Xuất File Mẫu Hóa Đơn (.bas Mapping)"
+])
 
 # ==========================================================================================
 # GIAI ĐOẠN 1: BẢO LƯU NGUYÊN BẢN 100% CODE GỐC CHẠY HOÀN CHỈNH CỦA USER
@@ -181,7 +186,7 @@ with tab_giai_doan_1:
                 st.error(f"Lỗi hệ thống G1: {str(e)}")
 
 # ==========================================================================================
-# GIAI ĐOẠN 2: KIẾN TRÚC MÃ NGUỒN THEO PHƯƠNG PHÁP PAB21 (CẬP NHẬT TÔ MÀU TAB & SHEET MỚI)
+# GIAI ĐOẠN 2: KIẾN TRÚC MÃ NGUỒN THEO PHƯƠNG PHÁP PAB21 (BẢO LƯU CHUẨN CODE1_V2)
 # ==========================================================================================
 with tab_giai_doan_2:
     st.header("Bước 2: Phân Tách Thuộc Tính & Tô Màu Tab Sheet PAB21")
@@ -202,9 +207,8 @@ with tab_giai_doan_2:
                 
                 for row_idx in range(2, ws_in.max_row + 1):
                     row_vals = [ws_in.cell(row=row_idx, column=c).value for c in range(1, 10)]
-                    if not row_vals[2] or row_vals[2] == "None": continue # Bỏ qua nếu mã hàng rỗng
+                    if not row_vals[2] or row_vals[2] == "None": continue
                     
-                    # Chuẩn hóa dữ liệu thô
                     val_sl = float(row_vals[6] or 0)
                     if val_sl == 0: continue
                     
@@ -225,7 +229,7 @@ with tab_giai_doan_2:
                     dic_gia_bia_ban[ma]["sl"] += r[6]
                 bảng_gia_bia_ban = [[i+1, v["ten"], k, v["dvt"], v["bia"], 0.0, v["sl"], v["bia"], v["sl"]*v["bia"]] for i, (k, v) in enumerate(dic_gia_bia_ban.items())]
 
-                # --- 2. TH GIÁ BÌA TRẢ (ÂM - TÍNH NĂNG MỚI) ---
+                # --- 2. TH GIÁ BÌA TRẢ (ÂM) ---
                 dic_gia_bia_tra = {}
                 for r in mảng_trả_âm:
                     ma = r[2]
@@ -260,7 +264,7 @@ with tab_giai_doan_2:
                         df = pd.DataFrame(data, columns=cols)
                         df.to_excel(writer, index=False, sheet_name=name)
                         ws = writer.sheets[name]
-                        ws.sheet_properties.tabColor = tab_color # TÔ MÀU TAB
+                        ws.sheet_properties.tabColor = tab_color
                         
                         r_last = len(df) + 2
                         s_sl, s_tt = df['Số lượng'].sum(), df['Thành tiền'].sum()
@@ -280,14 +284,12 @@ with tab_giai_doan_2:
                         trang_tri_sheet(ws, h_color, has_vat_summary=has_vat)
                         return len(df), s_sl, s_tt, v_val, st_val
 
-                    # Ghi các sheet theo thứ tự và màu sắc Tab
                     ghi_sheet(mảng_bán_dương, "Du_Lieu_Ban_Duong", "595959", "595959")
-                    ghi_sheet(mảng_trả_âm, "Du_Lieu_Tra_Am", "595959", "3B3838") # Màu 2 cho mảng Âm
+                    ghi_sheet(mảng_trả_âm, "Du_Lieu_Tra_Am", "595959", "3B3838")
                     
                     l, q, a, _, _ = ghi_sheet(bảng_gia_bia_ban, "TH_Hang_Ban_Gia_Bia", "002060", "002060")
                     summary_data.append(["TH Hàng Bán Giá Bìa", "Dương", l, q, a, 0, a, "Giá Bìa Gốc"])
                     
-                    # SHEET MỚI: Hàng trả theo giá bìa
                     l, q, a, _, _ = ghi_sheet(bảng_gia_bia_tra, "TH_Hang_Tra_Gia_Bia", "800000", "800000")
                     summary_data.append(["TH Hàng Trả Giá Bìa", "Âm", l, q, a, 0, a, "Bảo toàn dấu âm"])
 
@@ -297,7 +299,6 @@ with tab_giai_doan_2:
                     l_t, q_t, a_t, v_t, s_t = ghi_sheet(bảng_ck_tra, "Tong_Hop_Hang_Tra", "C00000", "C00000", has_vat=True)
                     summary_data.append(["Tổng Hợp Hàng Trả", "Âm", l_t, q_t, a_t, v_t, s_t, "Trả thực tế (Âm)"])
 
-                    # Tách Hóa đơn (Cùng màu Tab Teal)
                     if bảng_ck_ban:
                         for i, start in enumerate(range(0, len(bảng_ck_ban), 1000), 1):
                             batch = [list(r) for r in bảng_ck_ban[start:start+1000]]
@@ -306,13 +307,11 @@ with tab_giai_doan_2:
                             l, q, a, v, s = ghi_sheet(batch, hd_name, "008080", "008080", has_vat=True)
                             summary_data.append([hd_name, "Tách HĐ", l, q, a, v, s, f"Từ dòng {start+1}"])
 
-                    # Sheet Tổng Kết (Đẩy lên đầu)
                     df_sum = pd.DataFrame(summary_data, columns=["Tên Sheet / Hạng mục", "Loại", "Số dòng", "Số lượng", "Trước Thuế", "VAT (5%)", "Sau Thuế", "Ghi chú"])
                     df_sum.to_excel(writer, index=False, sheet_name="Tong_Ket_Chung")
                     ws_sum = writer.sheets["Tong_Ket_Chung"]
                     ws_sum.sheet_properties.tabColor = "1F1F1F"
                     
-                    # Doanh thu thực tế (Bán + Trả âm)
                     r_net = len(df_sum) + 2
                     ws_sum.cell(row=r_net, column=1).value = "DOANH THU THỰC TẾ (BÁN + TRẢ)"
                     ws_sum.cell(row=r_net, column=4).value = q_b + q_t
@@ -324,7 +323,125 @@ with tab_giai_doan_2:
                     wb = writer.book
                     wb._sheets = [wb._sheets[wb.sheetnames.index(n)] for n in (["Tong_Ket_Chung"] + [sn for sn in wb.sheetnames if sn != "Tong_Ket_Chung"])]
 
-                st.success("🎉 NÂNG CẤP TÍNH NĂNG THÀNH CÔNG!")
-                st.download_button(label="📥 TẢI MASTER REPORT NÂNG CẤP (PAB21 - CODE1)", data=out_report.getvalue(), file_name=f"Master_PAB21_Upgrade_{datetime.now().strftime('%m%d_%H%M')}.xlsx")
+                st.success("🎉 GIAI ĐOẠN 2 HOÀN TẤT CHÍNH XÁC!")
+                st.download_button(label="📥 TẢI MASTER REPORT G2", data=out_report.getvalue(), file_name=f"Master_PAB21_{datetime.now().strftime('%m%d_%H%M')}.xlsx")
             except Exception as e:
-                st.error(f"Lỗi: {str(e)}")
+                st.error(f"Lỗi G2: {str(e)}")
+
+# ==========================================================================================
+# GIAI ĐOẠN 3: XUẤT DỮ LIỆU SANG FILE MẪU HÓA ĐƠN - KẾ THỪA ÁNH XẠ .BAS VÀ ĐÓNG GÓI ZIP
+# ==========================================================================================
+with tab_giai_doan_3:
+    st.header("Bước 3: Trích Xuất Dữ Liệu Sang File Mẫu (.bas Mapping)")
+    st.info("Hệ thống sẽ quét toàn bộ các hóa đơn 'HD 1', 'HD 2'... từ file kết quả và bốc dữ liệu thả vào File Mẫu.")
+    
+    # Cổng nạp 1: File kết quả Master Report từ Bước 2
+    g3_result_file = st.file_uploader("1. Tải lên file Kết quả Master (Có chứa các sheet HD 1, HD 2...):", type=["xlsx"], key="g3_res_file")
+    # Cổng nạp 2: File Mẫu trắng (Template Excel để up hóa đơn điện tử)
+    g3_template_file = st.file_uploader("2. Tải lên FILE MẪU TRẮNG (Template Excel):", type=["xlsx", "xlsm"], key="g3_tpl_file")
+    
+    if g3_result_file is not None and g3_template_file is not None:
+        if st.button("📝 TIẾN HÀNH TRÍCH XUẤT HÓA ĐƠN ĐIỆN TỬ"):
+            try:
+                # Đọc file kết quả bằng openpyxl dạng data_only để lấy trị số thô
+                wb_res = openpyxl.load_workbook(g3_result_file, data_only=True)
+                
+                # Tạo một bộ nhớ đệm để chứa file ZIP xuất ra cho người dùng tải
+                zip_buffer = io.BytesIO()
+                
+                # Đếm xem có bao nhiêu hóa đơn được trích xuất thành công
+                success_count = 0
+                
+                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                    
+                    # Duyệt qua các sheet trong file kết quả 
+                    for sheet_name in wb_res.sheetnames:
+                        if "HD " in sheet_name: [cite: 3]
+                            ws_res = wb_res[sheet_name]
+                            
+                            last_row = ws_res.max_row
+                            # Xác định dòng kết thúc hàng hóa theo thuật toán (lastRowI - 3) 
+                            data_end_row = last_row - 3 [cite: 5]
+                            num_data_rows = data_end_row - 1 # Bỏ đi dòng tiêu đề [cite: 6]
+                            
+                            if num_data_rows < 1:
+                                continue
+                                
+                            # Đọc trị trị thanh toán sau thuế đã được làm tròn ở dòng sát cuối (lastRowI - 1) [cite: 4]
+                            val_ae11 = round(float(ws_res.cell(row=last_row - 1, column=9).value or 0), 0) [cite: 4]
+                            
+                            # Đọc mảng thô dữ liệu hàng hóa từ dòng 2 đến dòng kết thúc dữ liệu
+                            rows_data = []
+                            for r_idx in range(2, data_end_row + 1):
+                                r_vals = [ws_res.cell(row=r_idx, column=c_idx).value for c_idx in range(1, 10)]
+                                rows_data.append(r_vals)
+                                
+                            # NẠP FILE MẪU TRẮNG LÊN BỘ NHỚ ĐỂ ĐIỀN DỮ LIỆU [cite: 7]
+                            # Đọc không dùng data_only để giữ nguyên công thức sẵn có của File mẫu
+                            g3_template_file.seek(0)
+                            wb_tpl = openpyxl.load_workbook(g3_template_file, data_only=False)
+                            ws_tpl = wb_tpl.worksheets[0] # Lấy sheet đầu tiên của file mẫu [cite: 7]
+                            
+                            # --- THỰC THI ÁNH XẠ TOÀN DIỆN CỦA FILE .BAS --- 
+                            for offset, row_items in enumerate(rows_data):
+                                target_r = 11 + offset # Bắt đầu ghi từ dòng 11 trở đi 
+                                
+                                # Trích xuất thông tin theo thứ tự cột từ mảng kết quả
+                                t_ten_sach  = row_items[1] # Cột B: Tên sách 
+                                t_ma_so     = row_items[2] # Cột C: Mã số 
+                                t_dvt       = row_items[3] # Cột D: ĐVT [cite: 9]
+                                t_gia_bia   = row_items[4] # Cột E: Giá bìa 
+                                t_ck        = row_items[5] # Cột F: CK 
+                                t_sl        = row_items[6] # Cột G: Số lượng 
+                                t_don_gia   = row_items[7] # Cột H: Đơn giá bán 
+                                t_thanh_tien= row_items[8] # Cột I: Thành tiền chưa thuế [cite: 12, 13]
+                                
+                                # Ánh xạ chuẩn xác vào File Mẫu tương tự cơ chế sao chép Range: 
+                                ws_tpl.cell(row=target_r, column=22).value = t_ten_sach  # Cột V 
+                                ws_tpl.cell(row=target_r, column=21).value = t_ma_so     # Cột U 
+                                ws_tpl.cell(row=target_r, column=26).value = t_dvt       # Cột Z 
+                                ws_tpl.cell(row=target_r, column=23).value = t_gia_bia   # Cột W 
+                                ws_tpl.cell(row=target_r, column=24).value = t_ck        # Cột X 
+                                ws_tpl.cell(row=target_r, column=27).value = t_sl        # Cột AA 
+                                ws_tpl.cell(row=target_r, column=28).value = t_don_gia   # Cột AB 
+                                ws_tpl.cell(row=target_r, column=29).value = t_thanh_tien# Cột AC [cite: 12, 13]
+                                
+                                # Khôi phục cơ chế STT cột A tịnh tiến tuần tự 
+                                ws_tpl.cell(row=target_r, column=1).value = offset + 1 # Cột A [cite: 19]
+                            
+                            # Xử lý quy tắc sao chép (AutoFill) từ ô B11 của hệ thống cũ 
+                            val_b11 = ws_tpl.cell(row=11, column=2).value [cite: 16]
+                            if num_data_rows > 1: [cite: 16]
+                                for r_fill in range(12, 11 + num_data_rows):
+                                    ws_tpl.cell(row=r_fill, column=2).value = val_b11 [cite: 16]
+                                    
+                            # Gán tổng tiền đã được làm tròn vào ô AE11 tĩnh [cite: 17, 18]
+                            ws_tpl.cell(row=11, column=31).value = val_ae11 # Cột AE = Cột 31 [cite: 18]
+                            
+                            # Ghi dữ liệu của hóa đơn cụ thể này vào bộ nhớ tạm
+                            single_invoice_buffer = io.BytesIO()
+                            wb_tpl.save(single_invoice_buffer)
+                            
+                            # Đặt tên cho file hóa đơn mới xuất ra đúng định dạng 
+                            out_filename = f"Up_Hoa_Don_{sheet_name}_{datetime.now().strftime('%H%m')}.xlsx" [cite: 21]
+                            
+                            # Thêm file đơn lẻ này vào gói nén ZIP
+                            zip_file.writestr(out_filename, single_invoice_buffer.getvalue())
+                            success_count += 1
+                
+                if success_count == 0:
+                    st.warning("⚠️ Không tìm thấy sheet 'HD ' hợp lệ nào có chứa dữ liệu để xuất.")
+                    st.stop()
+                    
+                st.success(f"🎉 XUẤT HOÀN TẤT KHỚP CHUẨN: Đã đóng gói {success_count} file hóa đơn điện tử mẫu dạng nén!")
+                
+                # Tạo nút tải gói ZIP chứa đầy đủ hóa đơn về máy tính
+                st.download_button(
+                    label="📥 TẢI XUỐNG TOÀN BỘ FILE MẪU HÓA ĐƠN (.ZIP)",
+                    data=zip_buffer.getvalue(),
+                    file_name=f"Bo_Hoa_Don_Up_He_Thong_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip"
+                )
+                
+            except Exception as e:
+                st.error(f"Lỗi nghiêm trọng tại Giai đoạn 3: {str(e)}")
